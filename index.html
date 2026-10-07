@@ -452,6 +452,9 @@
   <!-- Informe de problemas -->
   <dialog id="bugDialog" class="small-dialog">
     <form method="dialog" class="small-inner">
+      <button type="submit" class="dialog-close" value="close" aria-label="Cerrar" title="Cerrar">
+        <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M4 4l8 8M12 4l-8 8" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>
+      </button>
       <h2>Reportar un problema</h2>
       <div class="dialog-lead muted">Cuéntanos qué ha fallado. Prepararemos un informe que puedes copiar, descargar o enviar.</div>
       <label class="field">
@@ -479,7 +482,6 @@
         <button type="button" class="btn ghost small" id="bugCopy">Copiar</button>
         <button type="button" class="btn primary small" id="bugSendApi" hidden>Enviar</button>
         <a class="btn primary small" id="bugSend" href="#" target="_blank" rel="noopener" hidden>Enviar</a>
-        <button type="submit" class="btn ghost small" value="close">Cerrar</button>
       </footer>
     </form>
   </dialog>

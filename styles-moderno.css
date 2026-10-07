@@ -699,3 +699,15 @@ input[type="color"] { cursor: pointer; }
 
 /* Campo trampa para bots: invisible para las personas */
 .hp-field { position: absolute !important; left: -10000px !important; width: 1px; height: 1px; opacity: 0; pointer-events: none; }
+
+/* ---------- Botón ✕ de los diálogos ---------- */
+.small-inner { position: relative; }
+.dialog-close {
+  position: absolute; top: 14px; right: 14px; width: 32px; height: 32px; border-radius: 10px;
+  display: grid; place-items: center; border: none; background: transparent; color: var(--muted); cursor: pointer;
+  transition: background .15s, color .15s;
+}
+.dialog-close svg { width: 16px; height: 16px; }
+.dialog-close:hover { background: var(--surface-2); color: var(--text); }
+.dialog-close:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.small-inner > h2 { padding-right: 36px; }
