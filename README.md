@@ -46,6 +46,14 @@ Para quedarte con uno de forma permanente, cambia el `href` de `<link id="design
 
 **Si cambias código protegido por la CSP:** si editas el pequeño script de `<head>` en `index.html` o el de `heic-sandbox.html`, recalcula su huella `sha256` en la CSP del mismo archivo, o el navegador lo bloqueará.
 
+## App de escritorio para Windows
+
+Pixelote también existe como programa de Windows (Tauri, ~3,5 MB), hecho a partir de esta misma web: ver [`desktop/README.md`](desktop/README.md).
+
+- La web enlaza a **`descargar.html`** («App para Windows» en la cabecera y «Descargar para Windows» en el pie). Esa página ofrece el instalador y la versión portable, con requisitos, el aviso de Windows la primera vez y las huellas SHA-256 para comprobar los archivos.
+- **Para publicar una versión nueva**, ejecuta `npm run publicar` en la carpeta `desktop/`. Compila, copia los `.exe` a `descargas/` y actualiza `descargas/version.js`, que la página lee para mostrar la versión, el tamaño y las huellas.
+- La versión se cambia en `desktop/src-tauri/tauri.conf.json` (y en `APP_VERSION` de `app.js` para que coincida).
+
 ## Instalarla como app y usarla sin conexión
 
 Con doble clic en `index.html` funciona todo menos la instalación, porque el navegador solo permite instalar páginas servidas por `https` (o desde `localhost`). Para instalarla:
@@ -65,6 +73,10 @@ Una vez servida, en "Opciones avanzadas" el botón **Descargar códecs** deja TI
 | Archivo | Contenido |
 |---|---|
 | `config.js` | Configuración (clave de Web3Forms para los informes) |
+| `ui-common.js` | Selector de idioma, tema y pie de página, compartidos por las dos páginas |
+| `descargar.html`, `descargar.js`, `descargar.css` | Página de descarga de la app de Windows |
+| `descargas/` | Instalador y `.exe` portable publicados, con `version.js` |
+| `desktop/` | Proyecto de la app de escritorio (Tauri) |
 | `index.html` | Estructura de la página |
 | `styles-moderno.css` | Diseño moderno (el activo) |
 | `i18n.js` | Traducciones (español, inglés, portugués, alemán) |

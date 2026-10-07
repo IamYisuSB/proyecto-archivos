@@ -1,0 +1,155 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <!-- Seguridad: la página solo carga código propio y del CDN de los códecs, y solo envía datos a Web3Forms.
+       Si cambias el script de abajo, recalcula su huella sha256. Si usas reportEndpoint, añade su dominio a connect-src. -->
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'sha256-m9dMXTQTlk/JuP85zKJ0hAnbAgpksdyMDPvv/IGMOvw=' https://cdn.jsdelivr.net blob: 'wasm-unsafe-eval'; worker-src 'self' blob:; connect-src 'self' https://cdn.jsdelivr.net https://api.web3forms.com blob: data:; img-src 'self' data: blob:; style-src 'self'; font-src 'self'; manifest-src 'self'; media-src 'none'; object-src 'none'; base-uri 'none'; form-action 'none'">
+  <meta name="referrer" content="strict-origin-when-cross-origin">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Descargar Pixelote para Windows</title>
+  <meta name="description" content="Pixelote como app de Windows: la misma app de conversión de imágenes, en su propia ventana.">
+  <meta name="theme-color" content="#5b5bd6">
+  <link rel="icon" href="icons/logo.svg" type="image/svg+xml">
+  <link rel="alternate icon" href="icons/icon-192.png" type="image/png">
+  <link rel="apple-touch-icon" href="icons/icon-192.png">
+  <link rel="stylesheet" href="styles-moderno.css" id="designCss">
+  <script>
+    // Tema elegido con el botón, antes de pintar para que no parpadee
+    try { var th = localStorage.getItem('pixelote.theme'); if (th) document.documentElement.dataset.theme = th; } catch (e) {}
+    // Diseño: el moderno por defecto. Para ver el clásico, abre la página con ?diseno=clasico
+    // (se recuerda; ?diseno=moderno vuelve al nuevo). El archivo del clásico es styles.css.
+    (function () {
+      var d = null;
+      try {
+        var q = new URLSearchParams(location.search).get('diseno');
+        if (q === 'clasico' || q === 'moderno') localStorage.setItem('pixelote.design', q);
+        d = localStorage.getItem('pixelote.design');
+      } catch (e) {}
+      if (d === 'clasico') document.getElementById('designCss').href = 'styles.css';
+      document.documentElement.dataset.design = d === 'clasico' ? 'clasico' : 'moderno';
+    })();
+  </script>
+  <link rel="stylesheet" href="descargar.css">
+</head>
+<body class="dl-body">
+  <header class="topbar">
+    <a class="brand brand-link" href="index.html">
+      <span class="logo" aria-hidden="true">
+        <svg viewBox="0 0 48 48" aria-hidden="true"><defs> <linearGradient id="pxg-head" x1="0" y1="0" x2="1" y2="1"> <stop offset="0" stop-color="#6d5dfc"/> <stop offset=".55" stop-color="#a855f7"/> <stop offset="1" stop-color="#ec4899"/> </linearGradient> </defs> <rect width="48" height="48" rx="14" fill="url(#pxg-head)"/> <g fill="#fff"> <rect x="12.5" y="9.5" width="5" height="5" rx="1.3"/> <rect x="18.5" y="9.5" width="5" height="5" rx="1.3"/> <rect x="24.5" y="9.5" width="5" height="5" rx="1.3"/> <rect x="12.5" y="15.5" width="5" height="5" rx="1.3"/> <rect x="30.5" y="15.5" width="5" height="5" rx="1.3"/> <rect x="12.5" y="21.5" width="5" height="5" rx="1.3"/> <rect x="18.5" y="21.5" width="5" height="5" rx="1.3"/> <rect x="24.5" y="21.5" width="5" height="5" rx="1.3"/> <rect x="12.5" y="27.5" width="5" height="5" rx="1.3"/> <rect x="12.5" y="33.5" width="5" height="5" rx="1.3"/> <rect x="19.6" y="34.6" width="3.8" height="3.8" rx="1" opacity=".85"/> <rect x="25.2" y="35.7" width="2.7" height="2.7" rx=".7" opacity=".65"/> <rect x="29.7" y="36.7" width="1.7" height="1.7" rx=".45" opacity=".45"/> </g></svg>
+      </span>
+      <div>
+        <h1>Pixelote</h1>
+        <p>Convierte, comprime, redimensiona y recorta imágenes por lotes</p>
+      </div>
+    </a>
+    <div class="top-actions">
+      <a class="btn ghost small" href="index.html">← Volver a la app</a>
+      <div class="lang-picker" id="langPicker">
+        <button type="button" class="lang-btn" id="langBtn" aria-haspopup="listbox" aria-expanded="false" aria-controls="langMenu" aria-label="Idioma">
+          <span class="flag" id="langFlag" aria-hidden="true"></span>
+          <span id="langCode"></span>
+          <svg class="caret" viewBox="0 0 12 12" aria-hidden="true"><path d="M3 4.5l3 3 3-3" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        </button>
+        <ul class="lang-menu" id="langMenu" role="listbox" aria-label="Idioma" hidden></ul>
+      </div>
+      <button class="icon-toggle" id="themeBtn" type="button"></button>
+    </div>
+  </header>
+
+  <main class="dl-page">
+    <section class="dl-hero">
+      <div class="dl-hero-text">
+        <span class="dl-kicker"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 5.5l7.5-1v7H3zM11.5 4.4L21 3v8.5h-9.5zM3 12.5h7.5v7L3 18.5zM11.5 12.5H21V21l-9.5-1.4z" fill="currentColor"/></svg> Windows 10 · 11</span>
+        <h2>Pixelote para Windows</h2>
+        <p class="dl-lead">La misma app, en su propia ventana: sin pestañas del navegador y a un clic desde el escritorio. Ocupa unos pocos megas y tus imágenes siguen sin salir de tu equipo.</p>
+        <div class="dl-buttons">
+          <a class="btn primary big dl-btn" id="dlInstaller" href="#">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 4v11m0 0l-4.5-4.5M12 15l4.5-4.5M5 20h14" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+            <span class="dl-btn-text"><span>Descargar instalador</span><small id="dlInstallerMeta"></small></span>
+          </a>
+          <a class="btn ghost big dl-btn" id="dlPortable" href="#">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><rect x="7" y="9" width="10" height="12" rx="2" fill="none" stroke="currentColor" stroke-width="1.9"/><path d="M9 9V4h6v5M10.5 6h.01M13.5 6h.01" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round"/></svg>
+            <span class="dl-btn-text"><span>Versión portable (sin instalar)</span><small id="dlPortableMeta"></small></span>
+          </a>
+        </div>
+        <p class="dl-version" id="dlVersion"></p>
+        <p class="dl-missing" id="dlMissing" hidden>Todavía no hay ninguna versión publicada. Se genera con <code>npm run publicar</code> en la carpeta <code>desktop/</code>.</p>
+      </div>
+      <div class="dl-preview" aria-hidden="true">
+        <div class="dl-window">
+          <div class="dl-titlebar"><span class="dl-title-logo"></span><span>Pixelote</span><span class="dl-dots"><i></i><i></i><i></i></span></div>
+          <div class="dl-window-body">
+            <div class="dl-tiles"><i></i><i></i><i></i><i></i><i></i><i></i></div>
+            <div class="dl-side"><b></b><span></span><span></span><span></span><em></em></div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section class="dl-grid">
+      <article class="dl-card">
+        <h3>Qué necesitas</h3>
+        <ul>
+          <li>Windows 10 u 11 de 64 bits.</li>
+          <li>WebView2, el motor de Edge: ya viene con Windows 11 y con Windows 10 actualizado. Si faltara, el instalador lo añade solo.</li>
+          <li>Nada más: no hace falta instalar ningún otro programa.</li>
+        </ul>
+      </article>
+      <article class="dl-card">
+        <h3>La primera vez que la abras</h3>
+        <p>La app no está firmada digitalmente, así que Windows puede mostrar «Windows protegió su PC». Pulsa:</p>
+        <ol>
+          <li>Más información</li>
+          <li>Ejecutar de todas formas</li>
+        </ol>
+        <p class="muted">Solo pasa la primera vez.</p>
+      </article>
+      <article class="dl-card">
+        <h3>¿Instalador o portable?</h3>
+        <p><b>Instalador:</b> añade Pixelote al menú Inicio y se desinstala desde Configuración, como cualquier programa.</p>
+        <p><b>Portable:</b> un único archivo .exe que no instala nada. Puedes llevarlo en una memoria USB.</p>
+      </article>
+      <article class="dl-card">
+        <h3>Comprueba que es auténtico</h3>
+        <p>Compara la huella SHA-256 del archivo descargado con la de aquí. En PowerShell:</p>
+        <code class="dl-cmd">Get-FileHash .\Pixelote*.exe</code>
+        <div class="dl-hashes" id="dlHashes"></div>
+      </article>
+    </section>
+
+    <section class="dl-compare">
+      <h3>Web o Windows</h3>
+      <div class="dl-table-wrap">
+        <table>
+          <thead><tr><th></th><th>Web</th><th>Windows</th></tr></thead>
+          <tbody>
+            <tr><th>Dónde funciona</th><td>Cualquier navegador moderno</td><td>Windows 10 y 11</td></tr>
+            <tr><th>Cómo se abre</th><td>En una pestaña</td><td>Con su propio icono y ventana</td></tr>
+            <tr><th>Instalación</th><td>Ninguna</td><td>Instalador o .exe portable</td></tr>
+            <tr><th>Funciones</th><td>Todas</td><td>Todas</td></tr>
+            <tr><th>Privacidad</th><td>Todo en tu equipo</td><td>Todo en tu equipo</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+  </main>
+
+  <footer class="site-footer">
+    <div class="footer-copy">
+      <span class="footer-logo"><svg viewBox="0 0 48 48" aria-hidden="true" width="22" height="22"><defs> <linearGradient id="pxg-foot" x1="0" y1="0" x2="1" y2="1"> <stop offset="0" stop-color="#6d5dfc"/> <stop offset=".55" stop-color="#a855f7"/> <stop offset="1" stop-color="#ec4899"/> </linearGradient> </defs> <rect width="48" height="48" rx="14" fill="url(#pxg-foot)"/> <g fill="#fff"> <rect x="12.5" y="9.5" width="5" height="5" rx="1.3"/> <rect x="18.5" y="9.5" width="5" height="5" rx="1.3"/> <rect x="24.5" y="9.5" width="5" height="5" rx="1.3"/> <rect x="12.5" y="15.5" width="5" height="5" rx="1.3"/> <rect x="30.5" y="15.5" width="5" height="5" rx="1.3"/> <rect x="12.5" y="21.5" width="5" height="5" rx="1.3"/> <rect x="18.5" y="21.5" width="5" height="5" rx="1.3"/> <rect x="24.5" y="21.5" width="5" height="5" rx="1.3"/> <rect x="12.5" y="27.5" width="5" height="5" rx="1.3"/> <rect x="12.5" y="33.5" width="5" height="5" rx="1.3"/> <rect x="19.6" y="34.6" width="3.8" height="3.8" rx="1" opacity=".85"/> <rect x="25.2" y="35.7" width="2.7" height="2.7" rx=".7" opacity=".65"/> <rect x="29.7" y="36.7" width="1.7" height="1.7" rx=".45" opacity=".45"/> </g></svg><span class="footer-brand">Pixelote</span></span>
+      <p id="footerCopy">Convierte tus imágenes sin subirlas a ningún sitio: todo ocurre en tu navegador, así que tus fotos siguen siendo solo tuyas.</p>
+      <p class="footer-small">Sin registros ni anuncios, y tus imágenes nunca se suben.</p>
+    </div>
+    <div class="footer-side">
+      <a class="btn ghost small" href="index.html">← Volver a la app</a>
+      <span class="footer-small">© <span id="year"></span> Pixelote</span>
+    </div>
+  </footer>
+
+  <script src="i18n.js"></script>
+  <script src="ui-common.js"></script>
+  <script src="descargas/version.js"></script>
+  <script src="descargar.js"></script>
+</body>
+</html>

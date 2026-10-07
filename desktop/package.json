@@ -1,0 +1,18 @@
+{
+  "name": "pixelote-desktop",
+  "private": true,
+  "version": "4.4.0",
+  "description": "Pixelote como app de escritorio para Windows (Tauri)",
+  "scripts": {
+    "copiar-web": "node scripts/copy-web.mjs",
+    "dev": "tauri dev",
+    "build": "tauri build --no-bundle",
+    "build:instalador": "tauri build",
+    "publicar": "tauri build && node scripts/publish.mjs",
+    "publicar:github": "tauri build && node scripts/publish.mjs --github",
+    "iconos": "tauri icon ../icons/icon-1024.png"
+  },
+  "devDependencies": {
+    "@tauri-apps/cli": "^2"
+  }
+}

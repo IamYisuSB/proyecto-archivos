@@ -1,0 +1,52 @@
+{
+  "$schema": "https://schema.tauri.app/config/2",
+  "productName": "Pixelote",
+  "version": "4.4.0",
+  "identifier": "com.pixelote.desktop",
+  "build": {
+    "frontendDist": "../dist",
+    "beforeDevCommand": "node scripts/copy-web.mjs",
+    "beforeBuildCommand": "node scripts/copy-web.mjs"
+  },
+  "app": {
+    "windows": [
+      {
+        "title": "Pixelote",
+        "width": 1400,
+        "height": 900,
+        "minWidth": 380,
+        "minHeight": 600,
+        "center": true,
+        "dragDropEnabled": false
+      }
+    ],
+    "security": {
+      "csp": null
+    }
+  },
+  "bundle": {
+    "active": true,
+    "targets": [
+      "nsis"
+    ],
+    "shortDescription": "Conversor de imágenes por lotes",
+    "icon": [
+      "icons/32x32.png",
+      "icons/128x128.png",
+      "icons/128x128@2x.png",
+      "icons/icon.ico"
+    ],
+    "windows": {
+      "nsis": {
+        "languages": [
+          "Spanish",
+          "English",
+          "PortugueseBR",
+          "German"
+        ],
+        "displayLanguageSelector": false,
+        "installMode": "currentUser"
+      }
+    }
+  }
+}

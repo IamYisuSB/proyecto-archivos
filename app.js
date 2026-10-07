@@ -5,7 +5,9 @@
   const $$ = (s, r = document) => Array.from(r.querySelectorAll(s));
   const t = (s, p) => I18N.t(s, p);
 
-  const APP_VERSION = '4.3.0';
+  const APP_VERSION = '4.4.0';
+  // Dentro de la app de escritorio (Tauri) no hace falta la parte de "app instalable"
+  const IS_DESKTOP = PixeloteUI.IS_DESKTOP;
 
   // Destino de los informes de problemas: se configura en config.js
   const CONFIG = window.PIXELOTE_CONFIG || {};
@@ -84,7 +86,6 @@
   const STORE_KEY = 'pixelote.settings.v1';
   const PRESETS_KEY = 'pixelote.presets';
   const LOGO_KEY = 'pixelote.logo';
-  const THEME_KEY = 'pixelote.theme';
 
   /* ---------- Estado ---------- */
 
@@ -1857,7 +1858,7 @@
         `Agente de usuario (técnico): ${navigator.userAgent}`,
         `Idioma: ${I18N.lang} · Tema: ${currentTheme()} · Diseño: ${document.documentElement.dataset.design || '—'}`,
         `Pantalla: ${screen.width}×${screen.height} @${window.devicePixelRatio}x · Ventana: ${innerWidth}×${innerHeight}`,
-        `Abierta desde: ${location.protocol.replace(':', '')} · Instalada: ${matchMedia('(display-mode: standalone)').matches ? 'sí' : 'no'}`,
+        `Abierta desde: ${IS_DESKTOP ? 'app de escritorio (Tauri)' : location.protocol.replace(':', '')} · Instalada: ${IS_DESKTOP || matchMedia('(display-mode: standalone)').matches ? 'sí' : 'no'}`,
         `Formatos que genera: ${FORMATS.filter((f) => f.mime && supported[f.id]).map((f) => f.label).join(', ')} · AVIF nativo: ${nativeAvif ? 'sí' : 'no'}`,
         `Workers en segundo plano: ${pool.slots.length}`,
         `Imágenes: ${items.length} (${Object.entries(types).map(([k, v]) => `${k} ×${v}`).join(', ') || '—'})`,
@@ -2168,112 +2169,22 @@
 
   /* ---------- Tema, idioma, app instalable ---------- */
 
-  function bindTheme() {
-    const btn = $('#themeBtn');
-    const media = matchMedia('(prefers-color-scheme: dark)');
-    const current = () => document.documentElement.dataset.theme || (media.matches ? 'dark' : 'light');
-    const paint = () => {
-      const dark = current() === 'dark';
-      btn.textContent = dark ? '☀️' : '🌙';
-      btn.title = t(dark ? 'Cambiar a modo claro' : 'Cambiar a modo oscuro');
-      btn.setAttribute('aria-label', btn.title);
-    };
-    btn.addEventListener('click', () => {
-      const next = current() === 'dark' ? 'light' : 'dark';
-      document.documentElement.dataset.theme = next;
-      saveJSON(THEME_KEY, next);
-      paint();
-    });
-    media.addEventListener('change', paint);
-    paint();
-    return paint;
-  }
-
-  /* Banderas en SVG (los emojis de bandera no se ven en Windows). `uid` evita
-   * ids repetidos cuando la misma bandera aparece varias veces. */
-  const LANG_NAMES = { es: 'Español', en: 'English', pt: 'Português (Brasil)', de: 'Deutsch' };
-  function flagSvg(lang, uid) {
-    const a = 'preserveAspectRatio="xMidYMid slice"';
-    switch (lang) {
-      case 'es':
-        return `<svg viewBox="0 0 750 500" ${a}><rect width="750" height="500" fill="#c60b1e"/><rect y="125" width="750" height="250" fill="#ffc400"/></svg>`;
-      case 'de':
-        return `<svg viewBox="0 0 5 3" ${a}><rect width="5" height="1" fill="#000"/><rect y="1" width="5" height="1" fill="#d00"/><rect y="2" width="5" height="1" fill="#ffce00"/></svg>`;
-      case 'pt':
-        return `<svg viewBox="0 0 720 504" ${a}><rect width="720" height="504" fill="#009c3b"/><path d="M360 43 677 252 360 461 43 252z" fill="#ffdf00"/>` +
-          `<circle cx="360" cy="252" r="124" fill="#002776"/><path d="M240 232Q360 206 480 262" stroke="#fff" stroke-width="16" fill="none"/></svg>`;
-      default: // en: Reino Unido
-        return `<svg viewBox="0 0 60 30" ${a}><clipPath id="${uid}s"><path d="M0 0v30h60V0z"/></clipPath>` +
-          `<clipPath id="${uid}t"><path d="M30 15h30v15zv15H0zH0V0zV0h30z"/></clipPath><g clip-path="url(#${uid}s)">` +
-          '<path d="M0 0v30h60V0z" fill="#012169"/><path d="M0 0l60 30m0-30L0 30" stroke="#fff" stroke-width="6"/>' +
-          `<path d="M0 0l60 30m0-30L0 30" clip-path="url(#${uid}t)" stroke="#c8102e" stroke-width="4"/>` +
-          '<path d="M30 0v30M0 15h60" stroke="#fff" stroke-width="10"/><path d="M30 0v30M0 15h60" stroke="#c8102e" stroke-width="6"/></g></svg>';
-    }
-  }
-
-  function bindLanguage(paintTheme) {
-    const btn = $('#langBtn');
-    const menu = $('#langMenu');
-    menu.innerHTML = I18N.LANGS.map((l) =>
-      `<li role="option" tabindex="-1" data-lang="${l}" lang="${l}"><span class="flag" aria-hidden="true">${flagSvg(l, 'flag-m-' + l)}</span><span>${LANG_NAMES[l]}</span></li>`).join('');
-    const options = () => $$('#langMenu [role="option"]');
-    const paintButton = () => {
-      $('#langFlag').innerHTML = flagSvg(I18N.lang, 'flag-b-' + I18N.lang);
-      $('#langCode').textContent = I18N.lang.toUpperCase();
-      btn.title = LANG_NAMES[I18N.lang];
-      options().forEach((li) => li.setAttribute('aria-selected', li.dataset.lang === I18N.lang));
-    };
-    const open = () => {
-      menu.hidden = false;
-      btn.setAttribute('aria-expanded', 'true');
-      (options().find((li) => li.dataset.lang === I18N.lang) || options()[0]).focus();
-    };
-    const close = (focusButton) => {
-      menu.hidden = true;
-      btn.setAttribute('aria-expanded', 'false');
-      if (focusButton) btn.focus();
-    };
-    const choose = (l) => { close(true); I18N.setLang(l); };
-
-    btn.addEventListener('click', () => (menu.hidden ? open() : close()));
-    btn.addEventListener('keydown', (e) => {
-      if (e.key === 'ArrowDown' || e.key === 'ArrowUp') { e.preventDefault(); open(); }
-    });
-    menu.addEventListener('click', (e) => {
-      const li = e.target.closest('[data-lang]');
-      if (li) choose(li.dataset.lang);
-    });
-    menu.addEventListener('keydown', (e) => {
-      const list = options();
-      const i = list.indexOf(document.activeElement);
-      if (e.key === 'ArrowDown') { e.preventDefault(); list[(i + 1) % list.length].focus(); }
-      else if (e.key === 'ArrowUp') { e.preventDefault(); list[(i - 1 + list.length) % list.length].focus(); }
-      else if (e.key === 'Home') { e.preventDefault(); list[0].focus(); }
-      else if (e.key === 'End') { e.preventDefault(); list[list.length - 1].focus(); }
-      else if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); if (i >= 0) choose(list[i].dataset.lang); }
-      else if (e.key === 'Escape') { e.preventDefault(); close(true); }
-      else if (e.key === 'Tab') close(false);
-    });
-    document.addEventListener('click', (e) => {
-      if (!menu.hidden && !e.target.closest('#langPicker')) close(false);
-    });
-    paintButton();
-
+  /* Lo que la app rehace al cambiar de idioma (el selector de idioma, el tema y
+   * el pie de página están en ui-common.js, compartido con descargar.html). */
+  function bindLanguage() {
     I18N.onChange(() => {
-      paintButton();
       document.title = t('Pixelote · Conversor de imágenes');
       document.body.dataset.drop = t('Suelta para añadir');
       renderPanelLists();
       renderCropRatios();
       syncPanel();
-      paintTheme();
       updateAllCards();
       refreshChrome();
     });
   }
 
   function setupPWA() {
-    if (!('serviceWorker' in navigator) || !/^https?:$/.test(location.protocol)) return;
+    if (IS_DESKTOP || !('serviceWorker' in navigator) || !/^https?:$/.test(location.protocol)) return;
     // El manifiesto solo se enlaza al servir la app por http(s): desde file:// el navegador lo bloquea
     const link = document.createElement('link');
     link.rel = 'manifest';
@@ -2373,7 +2284,6 @@
     document.title = t('Pixelote · Conversor de imágenes');
     document.body.dataset.drop = t('Suelta para añadir');
     $('#appVersion').textContent = APP_VERSION;
-    $('#year').textContent = new Date().getFullYear();
     await detectSupport();
     loadUaHints();
     if (!supported[settings.format]) settings.format = supported.webp ? 'webp' : 'jpeg';
@@ -2389,7 +2299,10 @@
     bindErrorPrompt();
     bindReorder();
     bindInput();
-    bindLanguage(bindTheme());
+    PixeloteUI.setupTheme();
+    PixeloteUI.setupLangPicker();
+    PixeloteUI.setupFooter();
+    bindLanguage();
     syncPanel();
     refreshChrome();
     checkSharedPreset();
