@@ -363,6 +363,7 @@
     ['Este error ya se envió hace poco. ¡Gracias!', 'This error was already reported recently. Thank you!', 'Este erro já foi enviado há pouco. Obrigado!', 'Dieser Fehler wurde vor Kurzem schon gemeldet. Danke!'],
     ['Has enviado varios informes en poco tiempo. Inténtalo más tarde.', "You've sent several reports in a short time. Please try again later.", 'Você enviou vários relatórios em pouco tempo. Tente mais tarde.', 'Du hast in kurzer Zeit mehrere Berichte gesendet. Versuche es später erneut.'],
     ['No hay conexión a internet. Puedes copiar o descargar el informe.', 'No internet connection. You can copy or download the report.', 'Sem conexão com a internet. Você pode copiar ou baixar o relatório.', 'Keine Internetverbindung. Du kannst den Bericht kopieren oder herunterladen.'],
+    ['Este navegador no puede generar: {f}. Prueba con Chrome, Edge o Firefox actualizados.', "This browser can't create: {f}. Try an up-to-date Chrome, Edge or Firefox.", 'Este navegador não consegue gerar: {f}. Experimente o Chrome, Edge ou Firefox atualizados.', 'Dieser Browser kann Folgendes nicht erzeugen: {f}. Probiere einen aktuellen Chrome, Edge oder Firefox.'],
     ['Ese email no parece válido', "That email doesn't look valid", 'Esse e-mail não parece válido', 'Diese E-Mail-Adresse scheint ungültig zu sein'],
   ];
   for (const [es, en, pt, de] of ROWS) { DICT.en[es] = en; DICT.pt[es] = pt; DICT.de[es] = de; }

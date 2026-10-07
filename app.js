@@ -93,6 +93,7 @@
   const items = [];
   const supported = {};
   let nativeAvif = false;
+  let wasmOK = false; // ¿puede ejecutar los códecs WebAssembly (AVIF y MozJPEG)?
   const pdfPages = new WeakMap(); // PDF de una página → su JPEG, para unirlos después
   const relDirs = new WeakMap(); // archivo → carpeta de origen (al soltar carpetas)
   let myPresets = loadJSON(PRESETS_KEY, []);
@@ -178,7 +179,30 @@
     }
     // Si el navegador no genera AVIF, se usa el codificador WebAssembly
     nativeAvif = supported.avif;
-    supported.avif = true;
+    wasmOK = canRunWasm();
+    // Sin AVIF propio se usa el codificador WebAssembly, si el navegador lo permite
+    supported.avif = nativeAvif || wasmOK;
+  }
+
+  /* Prepara un módulo WebAssembly vacío (8 bytes, sin descargar nada). Falla si
+   * el navegador no tiene WebAssembly o si su política de seguridad lo bloquea
+   * (por ejemplo, Safari anterior a la 16 no entiende 'wasm-unsafe-eval'). */
+  function canRunWasm() {
+    try {
+      if (typeof WebAssembly !== 'object' || typeof WebAssembly.Module !== 'function') return false;
+      const mod = new WebAssembly.Module(Uint8Array.of(0x00, 0x61, 0x73, 0x6d, 0x01, 0x00, 0x00, 0x00));
+      new WebAssembly.Instance(mod);
+      return true;
+    } catch (_) {
+      return false;
+    }
+  }
+
+  /* Formato que se puede generar de verdad: si el elegido no está disponible
+   * (p. ej. AVIF en un navegador sin WebAssembly), WebP o, si tampoco, JPG. */
+  function usableFormat(id) {
+    if (supported[id]) return FMT[id];
+    return supported.webp ? FMT.webp : FMT.jpeg;
   }
 
   function formatDesc(f) {
@@ -202,7 +226,7 @@
   function outFormat(it, s = settings) {
     if (s.format === 'auto') {
       const pick = { photo: s.autoPhoto, alpha: s.autoAlpha, graphic: s.autoGraphic }[it.cls || 'photo'];
-      return FMT[pick] || FMT.webp;
+      return usableFormat(FMT[pick] ? pick : 'webp');
     }
     if (s.format !== 'original') return FMT[s.format];
     const id = MIME_TO_FMT[it.file.type] || KIND_TO_FMT[it.kind];
@@ -434,7 +458,7 @@
       fmt: { id: fmt.id, mime: fmt.mime, lossy: !!fmt.lossy, alpha: !!fmt.alpha },
       quality: s.quality, targetOn: s.targetOn, targetKB: s.targetKB, bg: s.bg,
       pdfPage: s.pdfPage, pngMode: s.pngMode, pngColors: s.pngColors,
-      mozjpeg: s.mozjpeg, nativeAvif, exif: null, wm: wmActive(s) ? wmSpec(s) : null,
+      mozjpeg: s.mozjpeg && wasmOK, nativeAvif, exif: null, wm: wmActive(s) ? wmSpec(s) : null,
     };
     if (it.exif && s.meta !== 'strip' && META_FORMATS.includes(fmt.id)) {
       job.exif = Encoders.cleanExif(it.exif, s.meta === 'keep');
@@ -1297,7 +1321,11 @@
     $('#pdfMerge').checked = s.pdfMerge;
     $('#mozjpeg').checked = s.mozjpeg;
     $('#wmOn').checked = s.wmOn;
-    for (const key of ['autoPhoto', 'autoAlpha', 'autoGraphic']) $('#' + key).value = s[key];
+    for (const key of ['autoPhoto', 'autoAlpha', 'autoGraphic']) {
+      // Las opciones que el navegador no puede generar salen desactivadas
+      $$(`#${key} option`).forEach((o) => { o.disabled = !supported[o.value]; });
+      $('#' + key).value = supported[s[key]] ? s[key] : usableFormat(s[key]).id;
+    }
     $$('.mode-body').forEach((el) => { el.hidden = el.dataset.mode !== s.resizeMode; });
     $('[data-mode-hint="none"]').hidden = s.resizeMode !== 'none';
 
@@ -1305,10 +1333,13 @@
     const flexible = f.id === 'auto' || f.id === 'original'; // pueden salir varios formatos
     const lossy = f.lossy || flexible;
     $('#formatHint').textContent = formatDesc(f);
+    const missing = FORMATS.filter((x) => !supported[x.id]).map((x) => x.label);
+    $('#formatNote').hidden = !missing.length;
+    $('#formatNote').textContent = missing.length ? t('Este navegador no puede generar: {f}. Prueba con Chrome, Edge o Firefox actualizados.', { f: missing.join(', ') }) : '';
     $('#qualityBlock').hidden = !lossy;
     $('#pngOptions').hidden = !(f.id === 'png' || flexible);
     $('#pngColorsRow').hidden = s.pngMode !== 'palette';
-    $('#mozBlock').hidden = !(f.id === 'jpeg' || f.id === 'pdf' || flexible);
+    $('#mozBlock').hidden = !wasmOK || !(f.id === 'jpeg' || f.id === 'pdf' || flexible);
     $('#losslessHint').hidden = lossy || f.id === 'png';
     $('#metaHint').textContent = s.meta === 'strip'
       ? t('Se eliminan la cámara, la fecha, la ubicación y el resto de datos.')
