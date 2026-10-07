@@ -318,7 +318,7 @@
 
     // Pie de página
     ['Convierte tus imágenes sin subirlas a ningún sitio: todo ocurre en tu navegador, así que tus fotos siguen siendo solo tuyas.', 'Convert your images without uploading them anywhere: everything happens in your browser, so your photos stay yours alone.', 'Converta suas imagens sem enviá-las a lugar nenhum: tudo acontece no seu navegador, então suas fotos continuam sendo só suas.', 'Konvertiere deine Bilder, ohne sie irgendwo hochzuladen: Alles passiert in deinem Browser, deine Fotos bleiben also nur deine.'],
-    ['Sin registros, sin anuncios, sin servidores.', 'No sign-up, no ads, no servers.', 'Sem cadastro, sem anúncios, sem servidores.', 'Keine Anmeldung, keine Werbung, keine Server.'],
+    ['Sin registros ni anuncios, y tus imágenes nunca se suben.', 'No sign-up, no ads, and your images are never uploaded.', 'Sem cadastro nem anúncios, e suas imagens nunca são enviadas.', 'Keine Anmeldung, keine Werbung, und deine Bilder werden nie hochgeladen.'],
     ['🐞 Reportar un problema', '🐞 Report a problem', '🐞 Relatar um problema', '🐞 Problem melden'],
     ['Versión', 'Version', 'Versão', 'Version'],
 
@@ -336,6 +336,28 @@
     ['Informe copiado', 'Report copied', 'Relatório copiado', 'Bericht kopiert'],
     ['Escribe primero qué ha pasado', 'First describe what happened', 'Primeiro descreva o que aconteceu', 'Beschreibe zuerst, was passiert ist'],
     ['Copia o descarga el informe y envíaselo a quien mantiene Pixelote.', 'Copy or download the report and send it to whoever maintains Pixelote.', 'Copie ou baixe o relatório e envie para quem mantém o Pixelote.', 'Kopiere oder lade den Bericht herunter und sende ihn an die Person, die Pixelote betreut.'],
+
+    // Envío de informes y avisos de error
+    ['Tu email (opcional, para poder responderte)', 'Your email (optional, so we can reply)', 'Seu e-mail (opcional, para podermos responder)', 'Deine E-Mail (optional, damit wir antworten können)'],
+    ['nombre@ejemplo.com', 'name@example.com', 'nome@exemplo.com', 'name@beispiel.de'],
+    ['Enviando…', 'Sending…', 'Enviando…', 'Wird gesendet…'],
+    ['Informe enviado. ¡Gracias!', 'Report sent. Thank you!', 'Relatório enviado. Obrigado!', 'Bericht gesendet. Danke!'],
+    ['No se pudo enviar el informe. Puedes copiarlo o descargarlo.', "Couldn't send the report. You can copy or download it.", 'Não foi possível enviar o relatório. Você pode copiá-lo ou baixá-lo.', 'Der Bericht konnte nicht gesendet werden. Du kannst ihn kopieren oder herunterladen.'],
+    ['Se envió un informe del error automáticamente. ¡Gracias!', 'An error report was sent automatically. Thank you!', 'Um relatório do erro foi enviado automaticamente. Obrigado!', 'Ein Fehlerbericht wurde automatisch gesendet. Danke!'],
+    ['Algo ha fallado', 'Something went wrong', 'Algo deu errado', 'Etwas ist schiefgelaufen'],
+    ['Cerrar aviso', 'Close notice', 'Fechar aviso', 'Hinweis schließen'],
+    ['¿Nos envías un informe para arreglarlo? Solo lleva el error y datos técnicos; nunca tus imágenes ni sus nombres.', 'Send us a report so we can fix it? It only contains the error and technical data; never your images or their names.', 'Pode nos enviar um relatório para corrigirmos? Ele só contém o erro e dados técnicos; nunca suas imagens nem seus nomes.', 'Schickst du uns einen Bericht, damit wir das beheben können? Er enthält nur den Fehler und technische Daten, niemals deine Bilder oder deren Namen.'],
+    ['Enviar siempre sin preguntar', 'Always send without asking', 'Sempre enviar sem perguntar', 'Immer senden, ohne zu fragen'],
+    ['Añadir detalles', 'Add details', 'Adicionar detalhes', 'Details hinzufügen'],
+    ['Enviar informe', 'Send report', 'Enviar relatório', 'Bericht senden'],
+    ['Preparar informe', 'Prepare report', 'Preparar relatório', 'Bericht vorbereiten'],
+    ['Se produjo un error inesperado.', 'An unexpected error occurred.', 'Ocorreu um erro inesperado.', 'Ein unerwarteter Fehler ist aufgetreten.'],
+    ['No se pudo convertir {n} imagen.', "{n} image couldn't be converted.", 'Não foi possível converter {n} imagem.', '{n} Bild konnte nicht konvertiert werden.'],
+    ['No se pudieron convertir {n} imágenes.', "{n} images couldn't be converted.", 'Não foi possível converter {n} imagens.', '{n} Bilder konnten nicht konvertiert werden.'],
+    ['No se pudo leer un archivo {f}.', "A {f} file couldn't be read.", 'Não foi possível ler um arquivo {f}.', 'Eine {f}-Datei konnte nicht gelesen werden.'],
+    ['Informes de error', 'Error reports', 'Relatórios de erro', 'Fehlerberichte'],
+    ['Enviar automáticamente los informes de error', 'Send error reports automatically', 'Enviar relatórios de erro automaticamente', 'Fehlerberichte automatisch senden'],
+    ['Nunca incluyen tus imágenes ni sus nombres.', 'They never include your images or their names.', 'Nunca incluem suas imagens nem seus nomes.', 'Sie enthalten nie deine Bilder oder deren Namen.'],
   ];
   for (const [es, en, pt, de] of ROWS) { DICT.en[es] = en; DICT.pt[es] = pt; DICT.de[es] = de; }
 

@@ -6,7 +6,8 @@
   <title>Pixelote · Conversor de imágenes</title>
   <meta name="description" content="Convierte, comprime, redimensiona y recorta imágenes por lotes. Todo en tu navegador, sin subir nada.">
   <meta name="theme-color" content="#5b5bd6">
-  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><rect width='32' height='32' rx='8' fill='%235b5bd6'/><path d='M8 22l5-6 4 4 3-3 4 5z' fill='white'/><circle cx='21' cy='11' r='2.5' fill='white'/></svg>">
+  <link rel="icon" href="icons/logo.svg" type="image/svg+xml">
+  <link rel="alternate icon" href="icons/icon-192.png" type="image/png">
   <link rel="apple-touch-icon" href="icons/icon-192.png">
   <link rel="stylesheet" href="styles-moderno.css" id="designCss">
   <script>
@@ -30,7 +31,7 @@
   <header class="topbar">
     <div class="brand">
       <span class="logo" aria-hidden="true">
-        <svg viewBox="0 0 32 32"><rect width="32" height="32" rx="8" fill="currentColor"/><path d="M8 22l5-6 4 4 3-3 4 5z" fill="#fff"/><circle cx="21" cy="11" r="2.5" fill="#fff"/></svg>
+        <svg viewBox="0 0 48 48" aria-hidden="true"><defs> <linearGradient id="pxg-head" x1="0" y1="0" x2="1" y2="1"> <stop offset="0" stop-color="#6d5dfc"/> <stop offset=".55" stop-color="#a855f7"/> <stop offset="1" stop-color="#ec4899"/> </linearGradient> </defs> <rect width="48" height="48" rx="14" fill="url(#pxg-head)"/> <g fill="#fff"> <rect x="12.5" y="9.5" width="5" height="5" rx="1.3"/> <rect x="18.5" y="9.5" width="5" height="5" rx="1.3"/> <rect x="24.5" y="9.5" width="5" height="5" rx="1.3"/> <rect x="12.5" y="15.5" width="5" height="5" rx="1.3"/> <rect x="30.5" y="15.5" width="5" height="5" rx="1.3"/> <rect x="12.5" y="21.5" width="5" height="5" rx="1.3"/> <rect x="18.5" y="21.5" width="5" height="5" rx="1.3"/> <rect x="24.5" y="21.5" width="5" height="5" rx="1.3"/> <rect x="12.5" y="27.5" width="5" height="5" rx="1.3"/> <rect x="12.5" y="33.5" width="5" height="5" rx="1.3"/> <rect x="19.6" y="34.6" width="3.8" height="3.8" rx="1" opacity=".85"/> <rect x="25.2" y="35.7" width="2.7" height="2.7" rx=".7" opacity=".65"/> <rect x="29.7" y="36.7" width="1.7" height="1.7" rx=".45" opacity=".45"/> </g></svg>
       </span>
       <div>
         <h1>Pixelote</h1>
@@ -290,6 +291,11 @@
               <button type="button" class="btn ghost small" id="offlineBtn">Descargar códecs (HEIC, TIFF, AVIF, MozJPEG)</button>
               <small>Así podrás leer y crear todos los formatos aunque no tengas internet.</small>
             </div>
+            <div class="field" id="autoReportRow" hidden>
+              <span>Informes de error</span>
+              <label class="check first"><input type="checkbox" id="autoReport"> <span>Enviar automáticamente los informes de error</span></label>
+              <small>Nunca incluyen tus imágenes ni sus nombres.</small>
+            </div>
             <button type="button" class="btn ghost small" id="resetBtn">Restablecer ajustes</button>
           </div>
         </details>
@@ -309,9 +315,9 @@
 
   <footer class="site-footer">
     <div class="footer-copy">
-      <span class="footer-brand">Pixelote</span>
+      <span class="footer-logo"><svg viewBox="0 0 48 48" aria-hidden="true" width="22" height="22"><defs> <linearGradient id="pxg-foot" x1="0" y1="0" x2="1" y2="1"> <stop offset="0" stop-color="#6d5dfc"/> <stop offset=".55" stop-color="#a855f7"/> <stop offset="1" stop-color="#ec4899"/> </linearGradient> </defs> <rect width="48" height="48" rx="14" fill="url(#pxg-foot)"/> <g fill="#fff"> <rect x="12.5" y="9.5" width="5" height="5" rx="1.3"/> <rect x="18.5" y="9.5" width="5" height="5" rx="1.3"/> <rect x="24.5" y="9.5" width="5" height="5" rx="1.3"/> <rect x="12.5" y="15.5" width="5" height="5" rx="1.3"/> <rect x="30.5" y="15.5" width="5" height="5" rx="1.3"/> <rect x="12.5" y="21.5" width="5" height="5" rx="1.3"/> <rect x="18.5" y="21.5" width="5" height="5" rx="1.3"/> <rect x="24.5" y="21.5" width="5" height="5" rx="1.3"/> <rect x="12.5" y="27.5" width="5" height="5" rx="1.3"/> <rect x="12.5" y="33.5" width="5" height="5" rx="1.3"/> <rect x="19.6" y="34.6" width="3.8" height="3.8" rx="1" opacity=".85"/> <rect x="25.2" y="35.7" width="2.7" height="2.7" rx=".7" opacity=".65"/> <rect x="29.7" y="36.7" width="1.7" height="1.7" rx=".45" opacity=".45"/> </g></svg><span class="footer-brand">Pixelote</span></span>
       <p>Convierte tus imágenes sin subirlas a ningún sitio: todo ocurre en tu navegador, así que tus fotos siguen siendo solo tuyas.</p>
-      <p class="footer-small">Sin registros, sin anuncios, sin servidores.</p>
+      <p class="footer-small">Sin registros ni anuncios, y tus imágenes nunca se suben.</p>
     </div>
     <div class="footer-side">
       <button type="button" class="btn ghost small" id="bugBtn">🐞 Reportar un problema</button>
@@ -450,6 +456,10 @@
         <span>Pasos para repetirlo (opcional)</span>
         <textarea id="bugSteps" rows="2" class="text-input" placeholder="1. Elegí el atajo Instagram… 2. …"></textarea>
       </label>
+      <label class="field" id="bugEmailRow" hidden>
+        <span>Tu email (opcional, para poder responderte)</span>
+        <input type="email" id="bugEmail" class="text-input" placeholder="nombre@ejemplo.com" autocomplete="email">
+      </label>
       <label class="check"><input type="checkbox" id="bugDiag" checked> <span>Incluir datos técnicos (navegador, ajustes y errores; nunca tus imágenes ni sus nombres)</span></label>
       <details class="bug-preview">
         <summary>Ver el informe</summary>
@@ -460,14 +470,32 @@
         <button type="button" class="btn ghost small" id="bugDownload">Descargar</button>
         <span class="spacer"></span>
         <button type="button" class="btn ghost small" id="bugCopy">Copiar</button>
+        <button type="button" class="btn primary small" id="bugSendApi" hidden>Enviar</button>
         <a class="btn primary small" id="bugSend" href="#" target="_blank" rel="noopener" hidden>Enviar</a>
         <button type="submit" class="btn ghost small" value="close">Cerrar</button>
       </footer>
     </form>
   </dialog>
 
+  <!-- Aviso cuando la app detecta un error -->
+  <div class="error-prompt" id="errorPrompt" role="alertdialog" aria-labelledby="epTitle" hidden>
+    <div class="ep-head">
+      <span class="ep-icon" aria-hidden="true">⚠️</span>
+      <b id="epTitle">Algo ha fallado</b>
+      <button type="button" class="ep-close" id="epClose" aria-label="Cerrar aviso">✕</button>
+    </div>
+    <p class="ep-text" id="epText"></p>
+    <p class="ep-small">¿Nos envías un informe para arreglarlo? Solo lleva el error y datos técnicos; nunca tus imágenes ni sus nombres.</p>
+    <label class="check" id="epAlwaysRow"><input type="checkbox" id="epAlways"> <span>Enviar siempre sin preguntar</span></label>
+    <div class="ep-actions">
+      <button type="button" class="btn ghost small" id="epDetails">Añadir detalles</button>
+      <button type="button" class="btn primary small" id="epSend">Enviar informe</button>
+    </div>
+  </div>
+
   <div class="toast" id="toast" role="status" aria-live="polite"></div>
 
+  <script src="config.js"></script>
   <script src="i18n.js"></script>
   <script src="encoders.js"></script>
   <script src="pipeline.js"></script>

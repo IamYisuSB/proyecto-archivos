@@ -24,7 +24,10 @@ Para quedarte con uno de forma permanente, cambia el `href` de `<link id="design
 
 ## Informe de problemas
 
-El botón **🐞 Reportar un problema** del pie de página prepara un informe con la descripción y datos técnicos (navegador, ajustes, errores recientes; nunca las imágenes ni sus nombres) para copiarlo o descargarlo. Para que además aparezca el botón **Enviar**, rellena `BUG_REPORT` al principio de `app.js` con un email o un repositorio de GitHub (`usuario/repositorio`), y los informes llegarán como correo o como issue.
+- El botón **🐞 Reportar un problema** del pie de página prepara un informe con la descripción y datos técnicos: navegador, ajustes y errores recientes. Nunca incluye las imágenes, sus nombres ni sus carpetas; la app los cambia por `[archivo]`.
+- Además, **cuando la app detecta un error** (una conversión que falla, un archivo que no se puede leer, un fallo inesperado) muestra un aviso para enviar el informe con un clic. Ahí se puede marcar **«Enviar siempre sin preguntar»**, y en *Opciones avanzadas* se puede desactivar.
+
+Para que los informes **te lleguen al correo solos**, publica el Worker de la carpeta [`server/`](server/README.md) (Cloudflare + Resend, unos 10 minutos) y pon su dirección en `reportEndpoint` dentro de `config.js`. Si prefieres no usar un servidor, en `config.js` también puedes poner un repositorio de GitHub (`reportGithub`) o un email (`reportEmail`), pero entonces el envío lo completa la persona. Sin nada configurado, el informe se puede copiar o descargar.
 
 ## Instalarla como app y usarla sin conexión
 
@@ -44,10 +47,13 @@ Una vez servida, en "Opciones avanzadas" el botón **Descargar códecs** deja HE
 
 | Archivo | Contenido |
 |---|---|
+| `config.js` | Configuración (destino de los informes de problemas) |
 | `index.html` | Estructura de la página |
 | `styles-moderno.css` | Diseño moderno (el activo) |
 | `i18n.js` | Traducciones (español, inglés, portugués, alemán) |
-| `sw.js`, `manifest.webmanifest`, `icons/` | App instalable y uso sin conexión |
+| `sw.js`, `manifest.webmanifest` | App instalable y uso sin conexión |
+| `icons/` | Logo (`logo.svg`) e iconos de la app |
+| `server/` | Worker de Cloudflare que envía los informes por email con Resend |
 | `styles.css` | Diseño clásico, con modo claro/oscuro y versión móvil |
 | `app.js` | Interfaz: carga de imágenes, ajustes, editor, comparador y reparto del trabajo entre Workers |
 | `pipeline.js` | Procesado de una imagen (recorte, tamaño, codificación, EXIF); se ejecuta igual en un Worker o en la página |

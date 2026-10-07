@@ -81,6 +81,8 @@ Leyenda: ✅ hecho · 🔜 siguiente · 🧭 más adelante · 💡 idea a valora
 - ✅ **Alemán** como cuarto idioma.
 - ✅ **Pie de página** con presentación breve, versión e **informe de problemas** (copiar, descargar o enviar por email / GitHub si se configura).
 - ✅ **Diseño moderno** (`styles-moderno.css`) como alternativa al clásico, que se conserva (`?diseno=clasico`).
+- ✅ **Avisos automáticos de error** con envío del informe en un clic (u opcionalmente siempre), y envío directo al correo mediante un Worker de Cloudflare con Resend.
+- ✅ **Logo propio:** una «P» de píxeles que se van comprimiendo.
 
 **Notas técnicas**
 - Al publicar una versión nueva, sube `VERSION` en `sw.js` para que los navegadores renueven la caché.

@@ -1,0 +1,20 @@
+name = "pixelote-informes"
+main = "report-worker.js"
+compatibility_date = "2026-10-01"
+
+[vars]
+# Sin dominio propio verificado en Resend, usa onboarding@resend.dev
+# (solo puede enviar al email con el que te registraste en Resend).
+REPORT_FROM = "Pixelote <onboarding@resend.dev>"
+# Pon aquí la dirección donde publiques la app, separada por comas.
+# "null" permite enviar desde la app abierta con doble clic (file://).
+ALLOWED_ORIGINS = "null, http://localhost:8000"
+
+# Límite de envíos por IP gestionado por Cloudflare (5 por minuto)
+[[ratelimits]]
+name = "REPORT_LIMITER"
+namespace_id = "1001"
+
+  [ratelimits.simple]
+  limit = 5
+  period = 60
