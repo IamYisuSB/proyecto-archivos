@@ -10,6 +10,12 @@
     pako: 'https://cdn.jsdelivr.net/npm/pako@2.1.0/dist/pako.min.js',
     utif: 'https://cdn.jsdelivr.net/npm/utif@3.1.0/UTIF.js',
   };
+  // Huellas de las versiones exactas: si el CDN sirviera otra cosa, se rechaza
+  const SRI = {
+    heic2any: 'sha384-OTofQ0MEeiSgh62havBcemCIK0gqj809wX6UA0uPISNMRnR6NZyCdGzX3SbLrgwL',
+    pako: 'sha384-rNlaE5fs9dGIjmxWDALQh/RBAaGRYT5ChrzHo6tRfgrZ36iRFAiquP5g41Jsv+0j',
+    utif: 'sha384-RyBmXHdfZ/Uon+ud+/AqSyWpUWnKYt2tkRG/P4gWoRUGDU+qIAV3tGBPNlYTBZEF',
+  };
 
   const LABELS = { heic: 'HEIC', tiff: 'TIFF', raw: 'RAW' };
 
@@ -24,12 +30,15 @@
   }
 
   const scripts = {};
-  function loadScript(url) {
+  function loadScript(url, integrity) {
     if (!scripts[url]) {
       scripts[url] = new Promise((res, rej) => {
         const s = document.createElement('script');
         s.src = url;
         s.async = true;
+        s.integrity = integrity;
+        s.crossOrigin = 'anonymous';
+        s.referrerPolicy = 'no-referrer';
         s.onload = res;
         s.onerror = () => { delete scripts[url]; s.remove(); rej(new Error('No se pudo descargar ' + url)); };
         document.head.appendChild(s);
@@ -47,17 +56,80 @@
 
   /* ---------- HEIC / HEIF ---------- */
 
+  /* Descarga un archivo y comprueba que su huella SHA-384 es la esperada. */
+  async function fetchVerified(url, integrity) {
+    let res;
+    try { res = await fetch(url, { credentials: 'omit', referrerPolicy: 'no-referrer' }); } catch (_) { res = null; }
+    if (!res || !res.ok) throw new Error('No se pudo descargar ' + url);
+    const buf = await res.arrayBuffer();
+    const digest = new Uint8Array(await crypto.subtle.digest('SHA-384', buf));
+    let bin = '';
+    digest.forEach((b) => { bin += String.fromCharCode(b); });
+    if ('sha384-' + btoa(bin) !== integrity) throw new Error('La librería descargada no coincide con la esperada: ' + url);
+    return new TextDecoder().decode(buf);
+  }
+
+  /* heic2any necesita "new Function", que la página prohíbe por seguridad. Por
+   * eso se ejecuta en un iframe aislado (heic-sandbox.html) sin acceso a la
+   * página ni a internet; se le pasa el código ya verificado y la foto. */
+  let heicFrame = null;
+
+  function waitMessage(iframe, match, ms, timeoutMsg) {
+    return new Promise((res, rej) => {
+      const timer = setTimeout(() => { window.removeEventListener('message', on); rej(new Error(timeoutMsg)); }, ms);
+      function on(e) {
+        if (e.source !== iframe.contentWindow || !e.data || !match(e.data)) return;
+        clearTimeout(timer);
+        window.removeEventListener('message', on);
+        res(e.data);
+      }
+      window.addEventListener('message', on);
+    });
+  }
+
+  function heicSandbox() {
+    if (heicFrame) return heicFrame;
+    heicFrame = (async () => {
+      const code = await fetchVerified(CDN.heic2any, SRI.heic2any);
+      const iframe = document.createElement('iframe');
+      iframe.setAttribute('sandbox', 'allow-scripts');
+      iframe.setAttribute('aria-hidden', 'true');
+      iframe.tabIndex = -1;
+      iframe.hidden = true;
+      iframe.src = 'heic-sandbox.html';
+      const hello = waitMessage(iframe, (d) => d.type === 'hello', 15000, 'El decodificador HEIC no arranca');
+      document.body.appendChild(iframe);
+      try {
+        await hello;
+        const lib = waitMessage(iframe, (d) => d.type === 'lib', 30000, 'El decodificador HEIC no arranca');
+        iframe.contentWindow.postMessage({ type: 'lib', code }, '*');
+        if (!(await lib).ok) throw new Error('No se pudo iniciar el decodificador HEIC');
+      } catch (e) {
+        iframe.remove();
+        throw e;
+      }
+      return iframe;
+    })();
+    heicFrame.catch(() => { heicFrame = null; });
+    return heicFrame;
+  }
+
+  let heicSeq = 0;
   async function decodeHEIC(file) {
-    await loadScript(CDN.heic2any);
-    const out = await global.heic2any({ blob: file, toType: 'image/png' });
-    return Array.isArray(out) ? out[0] : out;
+    const iframe = await heicSandbox();
+    const id = ++heicSeq;
+    const answer = waitMessage(iframe, (d) => d.type === 'decoded' && d.id === id, 90000, 'El decodificador HEIC tardó demasiado');
+    iframe.contentWindow.postMessage({ type: 'decode', id, blob: file }, '*');
+    const d = await answer;
+    if (!d.ok || !(d.blob instanceof Blob)) throw new Error(d.msg || 'No se pudo decodificar el HEIC');
+    return d.blob;
   }
 
   /* ---------- TIFF (primera página) ---------- */
 
   async function decodeTIFF(file) {
-    await loadScript(CDN.pako); // UTIF lo necesita para TIFF con compresión Deflate
-    await loadScript(CDN.utif);
+    await loadScript(CDN.pako, SRI.pako); // UTIF lo necesita para TIFF con compresión Deflate
+    await loadScript(CDN.utif, SRI.utif);
     const UTIF = global.UTIF;
     const buf = await file.arrayBuffer();
     const ifds = UTIF.decode(buf).filter((i) => i.t256 && i.t257);

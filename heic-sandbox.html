@@ -1,0 +1,46 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<!-- Compartimento aislado para el decodificador HEIC (heic2any).
+     Esa librería necesita "new Function", algo que la página principal prohíbe.
+     Aquí se permite, pero este documento va en un iframe "sandbox" sin acceso a
+     la página, al almacenamiento ni a internet (connect-src solo blob:/data:).
+     La página principal le pasa el código de la librería ya verificado con su
+     huella SHA-384 y la foto; él devuelve la imagen decodificada.
+     Si cambias el script de abajo, recalcula su huella sha256 en esta CSP. -->
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'sha256-poIH5dOfcDu52WjgPzC+UpifimAIXfqzxS1oH5hJir4=' 'unsafe-eval'; worker-src blob:; img-src blob: data:; connect-src blob: data:">
+<title>Pixelote · decodificador HEIC</title>
+</head>
+<body>
+<script>
+(function () {
+  'use strict';
+  var ready = false;
+  window.addEventListener('message', function (e) {
+    if (e.source !== window.parent) return;
+    var msg = e.data || {};
+    if (msg.type === 'lib' && typeof msg.code === 'string') {
+      if (!ready) {
+        try { (0, eval)(msg.code); ready = typeof self.heic2any === 'function'; } catch (err) { ready = false; }
+      }
+      window.parent.postMessage({ type: 'lib', ok: ready }, '*');
+      return;
+    }
+    if (msg.type === 'decode' && msg.blob instanceof Blob) {
+      if (!ready) {
+        window.parent.postMessage({ type: 'decoded', id: msg.id, ok: false, msg: 'librería no cargada' }, '*');
+        return;
+      }
+      self.heic2any({ blob: msg.blob, toType: 'image/png' }).then(function (out) {
+        window.parent.postMessage({ type: 'decoded', id: msg.id, ok: true, blob: Array.isArray(out) ? out[0] : out }, '*');
+      }, function (err) {
+        window.parent.postMessage({ type: 'decoded', id: msg.id, ok: false, msg: String((err && err.message) || err) }, '*');
+      });
+    }
+  });
+  window.parent.postMessage({ type: 'hello' }, '*');
+})();
+</script>
+</body>
+</html>

@@ -5,7 +5,7 @@
   const $$ = (s, r = document) => Array.from(r.querySelectorAll(s));
   const t = (s, p) => I18N.t(s, p);
 
-  const APP_VERSION = '4.2.0';
+  const APP_VERSION = '4.3.0';
 
   // Destino de los informes de problemas: se configura en config.js
   const CONFIG = window.PIXELOTE_CONFIG || {};
@@ -618,7 +618,9 @@
       blob = await Codecs.decode(it.file, it.kind);
     } catch (e) {
       console.error(e);
-      if (/descargar/.test(e.message) || !navigator.onLine) throw new Error(t('Para leer {f} hace falta internet la primera vez', { f: label }));
+      if (/descargar/.test(e.message) || !navigator.onLine) {
+        throw new Error(it.kind === 'heic' ? t('Para leer HEIC hace falta conexión a internet') : t('Para leer {f} hace falta internet la primera vez', { f: label }));
+      }
       onAppError(t('No se pudo leer un archivo {f}.', { f: label }), `Falló la lectura de un archivo ${label}: ${e.message}`);
       if (/^Este RAW/.test(e.message)) throw new Error(t(e.message));
       throw new Error(t('No se pudo leer este {f}', { f: label }));
@@ -1700,14 +1702,29 @@
   /* ---------- Informe de problemas ---------- */
 
   const AUTO_REPORT_KEY = 'pixelote.autoReport';
+  const SENT_LOG_KEY = 'pixelote.reportsSent';
+  const WEB3FORMS_URL = 'https://api.web3forms.com/submit';
+  const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+  const EMAIL_RE = /^[^\s@<>()[\],;:"]{1,64}@[a-z0-9.-]{1,190}\.[a-z]{2,24}$/i;
+  // Límites de envío por navegador (sobreviven a recargar la página)
+  const LIMITS = { perHour: 5, perDay: 15, autoPerSession: 3, sameErrorHours: 24, minGapMs: 20000 };
+  const MAX_REPORT_CHARS = 8000;
+
+  function reportProvider() {
+    if (UUID_RE.test(String(CONFIG.web3formsKey || ''))) return 'web3forms';
+    if (/^https:\/\/|^http:\/\/(127\.0\.0\.1|localhost)[:/]/.test(String(CONFIG.reportEndpoint || ''))) return 'endpoint';
+    return null;
+  }
 
   function currentTheme() {
     return document.documentElement.dataset.theme || (matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light');
   }
 
-  /* Quita del texto los nombres de archivo y carpeta de la persona. */
+  /* Quita del texto todo lo que pueda identificar a la persona: nombres de sus
+   * archivos y carpetas, rutas de su equipo (llevan su usuario), emails y
+   * enlaces internos del navegador. */
   function scrub(text) {
-    let out = text;
+    let out = String(text);
     const names = new Set();
     items.forEach((i) => {
       names.add(i.file.name);
@@ -1716,7 +1733,13 @@
       if (i.relDir) i.relDir.split('/').forEach((d) => { if (d.length > 2) names.add(d); });
     });
     Array.from(names).sort((a, b) => b.length - a.length).forEach((n) => { out = out.split(n).join('[archivo]'); });
-    return out;
+    return out
+      .replace(/file:\/\/\/[^\s)'"]+/gi, '[ruta local]')
+      .replace(/[a-z]:\\(?:[^\\\s]+\\)*[^\\\s]*/gi, '[ruta local]')
+      .replace(/\/(?:Users|home)\/[^\s/)'"]+/g, '/[usuario]')
+      .replace(/blob:[^\s)'"]+/gi, '[blob]')
+      .replace(/[^\s@<>()]+@[^\s@<>()]+\.[a-z]{2,}/gi, '[email]')
+      .replace(/[\u0000-\u0008\u000b\u000c\u000e-\u001f\u007f]/g, '');
   }
 
   /* El informe va en español (lo lee quien mantiene la app). Nunca incluye las
@@ -1746,49 +1769,146 @@
         `Ajustes: ${JSON.stringify(s)}`,
         '', '## Errores recientes', ...(errorLog.length ? errorLog.map((e) => '- ' + e) : ['—']));
     }
-    return scrub(lines.join('\n'));
+    return scrub(lines.join('\n')).slice(0, MAX_REPORT_CHARS);
   }
 
   function dialogReport() {
     return buildReport($('#bugText').value.trim(), $('#bugSteps').value.trim(), $('#bugDiag').checked);
   }
 
+  /* Primero se limpia y después se corta: un email cortado ya no se reconocería. */
   function reportTitle(what) {
-    return (what.split('\n')[0] || 'Problema').slice(0, 80);
+    return scrub(what.split('\n')[0] || 'Problema').slice(0, 80);
   }
 
-  /* Enlace de GitHub o de correo, si se configuró alguno (y no hay Worker). */
+  /* Enlace de GitHub o de correo, si se configuró alguno (y no hay envío directo). */
   function bugSendUrl(report) {
     const title = '[Bug] ' + scrub(reportTitle($('#bugText').value.trim()));
-    if (CONFIG.reportGithub) {
+    if (/^[\w.-]+\/[\w.-]+$/.test(CONFIG.reportGithub || '')) {
       return `https://github.com/${CONFIG.reportGithub}/issues/new?title=${encodeURIComponent(title)}&body=${encodeURIComponent(report.slice(0, 6000))}`;
     }
-    if (CONFIG.reportEmail) {
+    if (EMAIL_RE.test(CONFIG.reportEmail || '')) {
       // Los clientes de correo cortan los enlaces mailto largos
       return `mailto:${CONFIG.reportEmail}?subject=${encodeURIComponent(title)}&body=${encodeURIComponent(report.slice(0, 1800))}`;
     }
     return null;
   }
 
-  /* Envía el informe al Worker (que lo manda por correo con Resend). */
-  async function postReport(subject, report, email, auto) {
-    const res = await fetch(CONFIG.reportEndpoint, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ subject: scrub(subject), report, email: email || '', auto: !!auto, version: APP_VERSION, hp: '' }),
-    });
-    if (!res.ok) throw new Error('HTTP ' + res.status);
+  /* Registro de envíos para limitar la frecuencia (horas y huellas de errores). */
+  function sentLog() {
+    const log = loadJSON(SENT_LOG_KEY, null);
+    const now = Date.now();
+    const keep = (arr, ms) => (Array.isArray(arr) ? arr.filter((x) => now - (x.t || x) < ms) : []);
+    return {
+      times: keep(log && log.times, 864e5),
+      sigs: keep(log && log.sigs, LIMITS.sameErrorHours * 36e5),
+    };
+  }
+
+  function hashText(s) {
+    let h = 2166136261;
+    for (let i = 0; i < s.length; i++) { h ^= s.charCodeAt(i); h = Math.imul(h, 16777619); }
+    return (h >>> 0).toString(36);
+  }
+
+  let lastSendAt = 0;
+  let autoSentThisSession = 0;
+
+  /* Comprueba los límites. Devuelve el motivo si no se puede enviar, o null. */
+  function rateLimited(auto, sig) {
+    const log = sentLog();
+    const now = Date.now();
+    if (!auto && now - lastSendAt < LIMITS.minGapMs) return 'gap';
+    if (log.times.filter((t) => now - t < 36e5).length >= LIMITS.perHour) return 'hour';
+    if (log.times.length >= LIMITS.perDay) return 'day';
+    if (auto && autoSentThisSession >= LIMITS.autoPerSession) return 'session';
+    if (sig && log.sigs.some((x) => x.h === sig)) return 'duplicate';
+    return null;
+  }
+
+  function recordSend(sig) {
+    const log = sentLog();
+    log.times.push(Date.now());
+    if (sig) log.sigs.push({ h: sig, t: Date.now() });
+    saveJSON(SENT_LOG_KEY, log);
+    lastSendAt = Date.now();
+  }
+
+  /* Envía el informe por el proveedor configurado. Lanza un error con `code`
+   * ('limit', 'offline', 'config' o 'send') si no se puede. */
+  async function sendReport({ subject, report, email, auto, sig }) {
+    const provider = reportProvider();
+    const fail = (code, detail) => Object.assign(new Error(detail || code), { code });
+    if (!provider) throw fail('config');
+    if (!navigator.onLine) throw fail('offline');
+    const limited = rateLimited(auto, sig);
+    if (limited) throw fail('limit', limited);
+
+    const cleanSubject = scrub(subject).replace(/[\r\n]+/g, ' ').slice(0, 100);
+    const replyto = EMAIL_RE.test(email || '') ? email : '';
+    const ctrl = new AbortController();
+    const timer = setTimeout(() => ctrl.abort(), 15000);
+    try {
+      let res;
+      if (provider === 'web3forms') {
+        res = await fetch(WEB3FORMS_URL, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
+          body: JSON.stringify({
+            access_key: CONFIG.web3formsKey,
+            subject: `[Pixelote${auto ? ' · auto' : ''}] ${cleanSubject}`,
+            from_name: 'Pixelote',
+            message: report,
+            version: APP_VERSION,
+            tipo: auto ? 'automático' : 'enviado por la persona',
+            ...(replyto ? { replyto } : {}),
+            botcheck: false,
+          }),
+          credentials: 'omit',
+          referrerPolicy: 'strict-origin',
+          signal: ctrl.signal,
+        });
+        const data = await res.json().catch(() => ({}));
+        if (!res.ok || data.success === false) throw fail('send', data.message || 'HTTP ' + res.status);
+      } else {
+        res = await fetch(CONFIG.reportEndpoint, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ subject: cleanSubject, report, email: replyto, auto: !!auto, version: APP_VERSION, hp: '' }),
+          credentials: 'omit',
+          signal: ctrl.signal,
+        });
+        if (!res.ok) throw fail('send', 'HTTP ' + res.status);
+      }
+    } catch (e) {
+      if (e.code) throw e;
+      throw fail('send', e.name === 'AbortError' ? 'tiempo agotado' : e.message);
+    } finally {
+      clearTimeout(timer);
+    }
+    recordSend(sig);
+    if (auto) autoSentThisSession++;
+  }
+
+  function sendErrorMessage(e) {
+    if (e.code === 'limit') {
+      return e.message === 'gap' ? t('Espera unos segundos antes de enviar otro informe.')
+        : e.message === 'duplicate' ? t('Este error ya se envió hace poco. ¡Gracias!')
+        : t('Has enviado varios informes en poco tiempo. Inténtalo más tarde.');
+    }
+    if (e.code === 'offline') return t('No hay conexión a internet. Puedes copiar o descargar el informe.');
+    return t('No se pudo enviar el informe. Puedes copiarlo o descargarlo.');
   }
 
   function refreshBugReport() {
     const report = dialogReport();
     $('#bugReport').textContent = report;
-    const api = !!CONFIG.reportEndpoint;
-    const url = api ? null : bugSendUrl(report);
-    $('#bugSendApi').hidden = !api;
-    $('#bugEmailRow').hidden = !api;
+    const direct = !!reportProvider();
+    const url = direct ? null : bugSendUrl(report);
+    $('#bugSendApi').hidden = !direct;
+    $('#bugEmailRow').hidden = !direct;
     $('#bugSend').hidden = !url;
-    $('#bugHint').hidden = api || !!url;
+    $('#bugHint').hidden = direct || !!url;
     if (url) $('#bugSend').href = url;
     return report;
   }
@@ -1805,41 +1925,45 @@
 
   /* ---------- Avisos automáticos de error ---------- */
 
-  // Errores pendientes de enviar (en español, para el informe) y control de avisos repetidos
+  // Error pendiente de enviar (en español, para el informe) y control de avisos repetidos
   let pendingError = null;
   const seenErrors = new Set();
-  let autoSent = 0;
 
   function autoReportOn() {
-    try { return !!CONFIG.reportEndpoint && localStorage.getItem(AUTO_REPORT_KEY) === '1'; } catch (_) { return false; }
+    try { return !!reportProvider() && localStorage.getItem(AUTO_REPORT_KEY) === '1'; } catch (_) { return false; }
   }
   function setAutoReport(on) {
     try { if (on) localStorage.setItem(AUTO_REPORT_KEY, '1'); else localStorage.removeItem(AUTO_REPORT_KEY); } catch (_) { /* nada */ }
     $('#autoReport').checked = on;
   }
 
+  function sendPendingError(auto) {
+    const err = pendingError;
+    const report = buildReport('Error detectado automáticamente: ' + err.reportText, '', true);
+    return sendReport({ subject: reportTitle(err.reportText), report, email: '', auto, sig: err.sig });
+  }
+
   /* Se llama cuando algo falla de verdad. `uiText` va traducido para el aviso;
    * `reportText` va en español para el informe. */
   function onAppError(uiText, reportText) {
-    const sig = reportText.slice(0, 160);
+    // La huella ignora números y horas, para no repetir el mismo error con otros datos
+    const sig = hashText(scrub(reportText).replace(/\d+/g, '#').slice(0, 200));
     if (seenErrors.has(sig)) return;
     seenErrors.add(sig);
-    pendingError = { uiText, reportText };
+    pendingError = { uiText, reportText, sig };
 
     if (autoReportOn()) {
-      if (autoSent >= 3) return; // como mucho 3 informes automáticos por sesión
-      autoSent++;
-      const report = buildReport('Error detectado automáticamente: ' + reportText, '', true);
-      postReport(reportTitle(reportText), report, '', true)
+      sendPendingError(true)
         .then(() => toast(t('Se envió un informe del error automáticamente. ¡Gracias!')))
-        .catch((e) => console.warn('No se pudo enviar el informe automático:', e.message));
+        .catch((e) => console.warn('No se envió el informe automático:', e.code, e.message));
       return;
     }
+    const direct = !!reportProvider();
     $('#epText').textContent = uiText;
-    $('#epAlwaysRow').hidden = !CONFIG.reportEndpoint;
+    $('#epAlwaysRow').hidden = !direct;
     $('#epAlways').checked = false;
     $('#epSend').disabled = false;
-    $('#epSend').textContent = t(CONFIG.reportEndpoint ? 'Enviar informe' : 'Preparar informe');
+    $('#epSend').textContent = t(direct ? 'Enviar informe' : 'Preparar informe');
     $('#errorPrompt').hidden = false;
   }
 
@@ -1870,25 +1994,25 @@
     });
     $('#epSend').addEventListener('click', async () => {
       if (!pendingError) return;
-      if (!CONFIG.reportEndpoint) { $('#epDetails').click(); return; }
+      if (!reportProvider()) { $('#epDetails').click(); return; }
       if ($('#epAlways').checked) setAutoReport(true);
       const btn = $('#epSend');
       btn.disabled = true;
       btn.textContent = t('Enviando…');
       try {
-        const report = buildReport('Error detectado automáticamente: ' + pendingError.reportText, '', true);
-        await postReport(reportTitle(pendingError.reportText), report, '', true);
+        await sendPendingError(false);
         closeErrorPrompt();
         toast(t('Informe enviado. ¡Gracias!'));
       } catch (e) {
-        console.warn('No se pudo enviar el informe:', e.message);
+        console.warn('No se envió el informe:', e.code, e.message);
         closeErrorPrompt();
+        if (e.code === 'limit' && e.message === 'duplicate') { toast(sendErrorMessage(e)); return; }
         openBugDialog('Error detectado automáticamente: ' + pendingError.reportText + '\n\n');
-        toast(t('No se pudo enviar el informe. Puedes copiarlo o descargarlo.'));
+        toast(sendErrorMessage(e));
       }
     });
 
-    $('#autoReportRow').hidden = !CONFIG.reportEndpoint;
+    $('#autoReportRow').hidden = !reportProvider();
     $('#autoReport').checked = autoReportOn();
     $('#autoReport').addEventListener('change', (e) => setAutoReport(e.target.checked));
   }
@@ -1922,18 +2046,23 @@
     });
     $('#bugSendApi').addEventListener('click', async () => {
       if (needText()) return;
+      const email = $('#bugEmail').value.trim();
+      if (email && !EMAIL_RE.test(email)) { toast(t('Ese email no parece válido')); $('#bugEmail').focus(); return; }
       const btn = $('#bugSendApi');
       btn.disabled = true;
       btn.textContent = t('Enviando…');
       try {
-        await postReport(reportTitle($('#bugText').value.trim()), refreshBugReport(), $('#bugEmail').value.trim(), false);
+        // Casilla trampa: solo un bot la marcaría. Se finge el envío y no se manda nada.
+        if (!$('#bugBotcheck').checked) {
+          await sendReport({ subject: reportTitle($('#bugText').value.trim()), report: refreshBugReport(), email, auto: false });
+        }
         $('#bugDialog').close();
         $('#bugText').value = '';
         $('#bugSteps').value = '';
         toast(t('Informe enviado. ¡Gracias!'));
       } catch (e) {
-        console.warn('No se pudo enviar el informe:', e.message);
-        toast(t('No se pudo enviar el informe. Puedes copiarlo o descargarlo.'));
+        console.warn('No se envió el informe:', e.code, e.message);
+        toast(sendErrorMessage(e));
       } finally {
         btn.disabled = false;
         btn.textContent = t('Enviar');
@@ -1964,11 +2093,78 @@
     return paint;
   }
 
+  /* Banderas en SVG (los emojis de bandera no se ven en Windows). `uid` evita
+   * ids repetidos cuando la misma bandera aparece varias veces. */
+  const LANG_NAMES = { es: 'Español', en: 'English', pt: 'Português (Brasil)', de: 'Deutsch' };
+  function flagSvg(lang, uid) {
+    const a = 'preserveAspectRatio="xMidYMid slice"';
+    switch (lang) {
+      case 'es':
+        return `<svg viewBox="0 0 750 500" ${a}><rect width="750" height="500" fill="#c60b1e"/><rect y="125" width="750" height="250" fill="#ffc400"/></svg>`;
+      case 'de':
+        return `<svg viewBox="0 0 5 3" ${a}><rect width="5" height="1" fill="#000"/><rect y="1" width="5" height="1" fill="#d00"/><rect y="2" width="5" height="1" fill="#ffce00"/></svg>`;
+      case 'pt':
+        return `<svg viewBox="0 0 720 504" ${a}><rect width="720" height="504" fill="#009c3b"/><path d="M360 43 677 252 360 461 43 252z" fill="#ffdf00"/>` +
+          `<circle cx="360" cy="252" r="124" fill="#002776"/><path d="M240 232Q360 206 480 262" stroke="#fff" stroke-width="16" fill="none"/></svg>`;
+      default: // en: Reino Unido
+        return `<svg viewBox="0 0 60 30" ${a}><clipPath id="${uid}s"><path d="M0 0v30h60V0z"/></clipPath>` +
+          `<clipPath id="${uid}t"><path d="M30 15h30v15zv15H0zH0V0zV0h30z"/></clipPath><g clip-path="url(#${uid}s)">` +
+          '<path d="M0 0v30h60V0z" fill="#012169"/><path d="M0 0l60 30m0-30L0 30" stroke="#fff" stroke-width="6"/>' +
+          `<path d="M0 0l60 30m0-30L0 30" clip-path="url(#${uid}t)" stroke="#c8102e" stroke-width="4"/>` +
+          '<path d="M30 0v30M0 15h60" stroke="#fff" stroke-width="10"/><path d="M30 0v30M0 15h60" stroke="#c8102e" stroke-width="6"/></g></svg>';
+    }
+  }
+
   function bindLanguage(paintTheme) {
-    const sel = $('#lang');
-    sel.value = I18N.lang;
-    sel.addEventListener('change', () => I18N.setLang(sel.value));
+    const btn = $('#langBtn');
+    const menu = $('#langMenu');
+    menu.innerHTML = I18N.LANGS.map((l) =>
+      `<li role="option" tabindex="-1" data-lang="${l}" lang="${l}"><span class="flag" aria-hidden="true">${flagSvg(l, 'flag-m-' + l)}</span><span>${LANG_NAMES[l]}</span></li>`).join('');
+    const options = () => $$('#langMenu [role="option"]');
+    const paintButton = () => {
+      $('#langFlag').innerHTML = flagSvg(I18N.lang, 'flag-b-' + I18N.lang);
+      $('#langCode').textContent = I18N.lang.toUpperCase();
+      btn.title = LANG_NAMES[I18N.lang];
+      options().forEach((li) => li.setAttribute('aria-selected', li.dataset.lang === I18N.lang));
+    };
+    const open = () => {
+      menu.hidden = false;
+      btn.setAttribute('aria-expanded', 'true');
+      (options().find((li) => li.dataset.lang === I18N.lang) || options()[0]).focus();
+    };
+    const close = (focusButton) => {
+      menu.hidden = true;
+      btn.setAttribute('aria-expanded', 'false');
+      if (focusButton) btn.focus();
+    };
+    const choose = (l) => { close(true); I18N.setLang(l); };
+
+    btn.addEventListener('click', () => (menu.hidden ? open() : close()));
+    btn.addEventListener('keydown', (e) => {
+      if (e.key === 'ArrowDown' || e.key === 'ArrowUp') { e.preventDefault(); open(); }
+    });
+    menu.addEventListener('click', (e) => {
+      const li = e.target.closest('[data-lang]');
+      if (li) choose(li.dataset.lang);
+    });
+    menu.addEventListener('keydown', (e) => {
+      const list = options();
+      const i = list.indexOf(document.activeElement);
+      if (e.key === 'ArrowDown') { e.preventDefault(); list[(i + 1) % list.length].focus(); }
+      else if (e.key === 'ArrowUp') { e.preventDefault(); list[(i - 1 + list.length) % list.length].focus(); }
+      else if (e.key === 'Home') { e.preventDefault(); list[0].focus(); }
+      else if (e.key === 'End') { e.preventDefault(); list[list.length - 1].focus(); }
+      else if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); if (i >= 0) choose(list[i].dataset.lang); }
+      else if (e.key === 'Escape') { e.preventDefault(); close(true); }
+      else if (e.key === 'Tab') close(false);
+    });
+    document.addEventListener('click', (e) => {
+      if (!menu.hidden && !e.target.closest('#langPicker')) close(false);
+    });
+    paintButton();
+
     I18N.onChange(() => {
+      paintButton();
       document.title = t('Pixelote · Conversor de imágenes');
       document.body.dataset.drop = t('Suelta para añadir');
       renderPanelLists();
@@ -2018,8 +2214,8 @@
         try { const r = await fetch(u); if (r.ok) ok++; } catch (_) { /* sin conexión */ }
       }
       btn.disabled = false;
-      btn.textContent = t('Descargar códecs (HEIC, TIFF, AVIF, MozJPEG)');
-      toast(ok === urls.length ? t('Listo: ya puedes usar todos los formatos sin conexión') : t('No se pudieron descargar todos los códecs. ¿Hay conexión?'));
+      btn.textContent = t('Descargar códecs (TIFF, AVIF, MozJPEG)');
+      toast(ok === urls.length ? t('Listo: ya puedes usar TIFF, AVIF y MozJPEG sin conexión') : t('No se pudieron descargar todos los códecs. ¿Hay conexión?'));
     });
   }
 

@@ -4,11 +4,12 @@
  *   actualizándose en segundo plano (stale-while-revalidate).
  * - Códecs del CDN (HEIC, TIFF, AVIF, MozJPEG): sus URL llevan versión fija,
  *   así que se guardan la primera vez que se usan y luego salen de la caché. */
-const VERSION = 'pixelote-v7';
+const VERSION = 'pixelote-v8';
 const CDN_CACHE = 'pixelote-cdn';
 const SHELL = [
   './',
   './index.html',
+  './heic-sandbox.html',
   './config.js',
   './styles.css',
   './styles-moderno.css',
@@ -44,7 +45,8 @@ self.addEventListener('fetch', (e) => {
   if (url.hostname === 'cdn.jsdelivr.net') {
     e.respondWith(caches.open(CDN_CACHE).then(async (cache) => {
       const hit = await cache.match(req, { ignoreVary: true });
-      if (hit) return hit;
+      // Una copia "opaca" no sirve para comprobar la huella (SRI) de una petición CORS
+      if (hit && !(hit.type === 'opaque' && req.mode === 'cors')) return hit;
       const res = await fetch(req);
       if (res.ok || res.type === 'opaque') cache.put(req, res.clone());
       return res;

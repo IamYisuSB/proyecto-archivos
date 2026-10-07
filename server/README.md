@@ -1,4 +1,6 @@
-# Informes de problemas por email (Cloudflare Worker + Resend)
+# Alternativa: informes por email con tu propio Worker (Cloudflare + Resend)
+
+> Ahora mismo Pixelote usa **Web3Forms** (`web3formsKey` en `config.js`), que no necesita nada de esto. Este Worker es una alternativa por si en el futuro prefieres tu propio servidor con Resend: para usarlo, vacía `web3formsKey`, rellena `reportEndpoint` y añade la dirección del Worker a `connect-src` en la CSP de `index.html`.
 
 Con esto, cuando alguien pulsa **Enviar informe** en Pixelote (o cuando la app detecta un error y la persona acepta enviarlo), el informe te llega directamente al correo.
 

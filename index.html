@@ -2,6 +2,10 @@
 <html lang="es">
 <head>
   <meta charset="utf-8">
+  <!-- Seguridad: la página solo carga código propio y del CDN de los códecs, y solo envía datos a Web3Forms.
+       Si cambias el script de abajo, recalcula su huella sha256. Si usas reportEndpoint, añade su dominio a connect-src. -->
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'sha256-m9dMXTQTlk/JuP85zKJ0hAnbAgpksdyMDPvv/IGMOvw=' https://cdn.jsdelivr.net blob: 'wasm-unsafe-eval'; worker-src 'self' blob:; connect-src 'self' https://cdn.jsdelivr.net https://api.web3forms.com blob: data:; img-src 'self' data: blob:; style-src 'self'; font-src 'self'; manifest-src 'self'; media-src 'none'; object-src 'none'; base-uri 'none'; form-action 'none'">
+  <meta name="referrer" content="strict-origin-when-cross-origin">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Pixelote · Conversor de imágenes</title>
   <meta name="description" content="Convierte, comprime, redimensiona y recorta imágenes por lotes. Todo en tu navegador, sin subir nada.">
@@ -44,12 +48,14 @@
         <span>Tus imágenes no salen de tu equipo</span>
       </div>
       <button class="btn ghost small" id="installBtn" type="button" hidden>⬇ Instalar app</button>
-      <select id="lang" class="lang-select" aria-label="Idioma">
-        <option value="es">ES</option>
-        <option value="en">EN</option>
-        <option value="pt">PT</option>
-        <option value="de">DE</option>
-      </select>
+      <div class="lang-picker" id="langPicker">
+        <button type="button" class="lang-btn" id="langBtn" aria-haspopup="listbox" aria-expanded="false" aria-controls="langMenu" aria-label="Idioma">
+          <span class="flag" id="langFlag" aria-hidden="true"></span>
+          <span id="langCode"></span>
+          <svg class="caret" viewBox="0 0 12 12" aria-hidden="true"><path d="M3 4.5l3 3 3-3" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        </button>
+        <ul class="lang-menu" id="langMenu" role="listbox" aria-label="Idioma" hidden></ul>
+      </div>
       <button class="icon-toggle" id="themeBtn" type="button"></button>
     </div>
   </header>
@@ -288,8 +294,8 @@
             </div>
             <div class="field" id="offlineRow" hidden>
               <span>Uso sin conexión</span>
-              <button type="button" class="btn ghost small" id="offlineBtn">Descargar códecs (HEIC, TIFF, AVIF, MozJPEG)</button>
-              <small>Así podrás leer y crear todos los formatos aunque no tengas internet.</small>
+              <button type="button" class="btn ghost small" id="offlineBtn">Descargar códecs (TIFF, AVIF, MozJPEG)</button>
+              <small>Así podrás usar TIFF, AVIF y MozJPEG aunque no tengas internet. HEIC siempre necesita conexión: por seguridad, su decodificador va aislado.</small>
             </div>
             <div class="field" id="autoReportRow" hidden>
               <span>Informes de error</span>
@@ -460,6 +466,7 @@
         <span>Tu email (opcional, para poder responderte)</span>
         <input type="email" id="bugEmail" class="text-input" placeholder="nombre@ejemplo.com" autocomplete="email">
       </label>
+      <input type="checkbox" id="bugBotcheck" name="botcheck" class="hp-field" tabindex="-1" autocomplete="off" aria-hidden="true">
       <label class="check"><input type="checkbox" id="bugDiag" checked> <span>Incluir datos técnicos (navegador, ajustes y errores; nunca tus imágenes ni sus nombres)</span></label>
       <details class="bug-preview">
         <summary>Ver el informe</summary>

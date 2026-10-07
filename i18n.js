@@ -232,10 +232,11 @@
     ['Se conservan al guardar en JPG, PNG o WebP a partir de fotos JPG.', 'Kept when saving to JPG, PNG or WebP from JPG photos.', 'São mantidos ao salvar em JPG, PNG ou WebP a partir de fotos JPG.', 'Bleiben erhalten, wenn JPG-Fotos als JPG, PNG oder WebP gespeichert werden.'],
     ['La ubicación GPS se borra.', 'The GPS location is deleted.', 'A localização GPS é apagada.', 'Der GPS-Standort wird gelöscht.'],
     ['Uso sin conexión', 'Offline use', 'Uso offline', 'Offline-Nutzung'],
-    ['Descargar códecs (HEIC, TIFF, AVIF, MozJPEG)', 'Download codecs (HEIC, TIFF, AVIF, MozJPEG)', 'Baixar codecs (HEIC, TIFF, AVIF, MozJPEG)', 'Codecs herunterladen (HEIC, TIFF, AVIF, MozJPEG)'],
-    ['Así podrás leer y crear todos los formatos aunque no tengas internet.', 'So you can read and create every format even without internet.', 'Assim você poderá ler e criar todos os formatos mesmo sem internet.', 'So kannst du alle Formate auch ohne Internet lesen und erzeugen.'],
+    ['Descargar códecs (TIFF, AVIF, MozJPEG)', 'Download codecs (TIFF, AVIF, MozJPEG)', 'Baixar codecs (TIFF, AVIF, MozJPEG)', 'Codecs herunterladen (TIFF, AVIF, MozJPEG)'],
+    ['Así podrás usar TIFF, AVIF y MozJPEG aunque no tengas internet. HEIC siempre necesita conexión: por seguridad, su decodificador va aislado.', 'So you can use TIFF, AVIF and MozJPEG even without internet. HEIC always needs a connection: for security, its decoder runs isolated.', 'Assim você poderá usar TIFF, AVIF e MozJPEG mesmo sem internet. HEIC sempre precisa de conexão: por segurança, seu decodificador roda isolado.', 'So kannst du TIFF, AVIF und MozJPEG auch ohne Internet nutzen. HEIC braucht immer eine Verbindung: Aus Sicherheitsgründen läuft sein Decoder isoliert.'],
+    ['Para leer HEIC hace falta conexión a internet', 'Reading HEIC needs an internet connection', 'Para ler HEIC é preciso conexão com a internet', 'Zum Lesen von HEIC wird eine Internetverbindung benötigt'],
     ['Descargando… {i}/{n}', 'Downloading… {i}/{n}', 'Baixando… {i}/{n}', 'Wird heruntergeladen… {i}/{n}'],
-    ['Listo: ya puedes usar todos los formatos sin conexión', 'Done: you can now use every format offline', 'Pronto: agora você pode usar todos os formatos offline', 'Fertig: Du kannst jetzt alle Formate offline nutzen'],
+    ['Listo: ya puedes usar TIFF, AVIF y MozJPEG sin conexión', 'Done: you can now use TIFF, AVIF and MozJPEG offline', 'Pronto: agora você pode usar TIFF, AVIF e MozJPEG offline', 'Fertig: Du kannst TIFF, AVIF und MozJPEG jetzt offline nutzen'],
     ['No se pudieron descargar todos los códecs. ¿Hay conexión?', "Couldn't download all the codecs. Are you online?", 'Não foi possível baixar todos os codecs. Há conexão?', 'Nicht alle Codecs konnten heruntergeladen werden. Bist du online?'],
     ['Restablecer ajustes', 'Reset settings', 'Restaurar configurações', 'Einstellungen zurücksetzen'],
     ['Ajustes restablecidos', 'Settings reset', 'Configurações restauradas', 'Einstellungen zurückgesetzt'],
@@ -358,6 +359,11 @@
     ['Informes de error', 'Error reports', 'Relatórios de erro', 'Fehlerberichte'],
     ['Enviar automáticamente los informes de error', 'Send error reports automatically', 'Enviar relatórios de erro automaticamente', 'Fehlerberichte automatisch senden'],
     ['Nunca incluyen tus imágenes ni sus nombres.', 'They never include your images or their names.', 'Nunca incluem suas imagens nem seus nomes.', 'Sie enthalten nie deine Bilder oder deren Namen.'],
+    ['Espera unos segundos antes de enviar otro informe.', 'Wait a few seconds before sending another report.', 'Espere alguns segundos antes de enviar outro relatório.', 'Warte ein paar Sekunden, bevor du einen weiteren Bericht sendest.'],
+    ['Este error ya se envió hace poco. ¡Gracias!', 'This error was already reported recently. Thank you!', 'Este erro já foi enviado há pouco. Obrigado!', 'Dieser Fehler wurde vor Kurzem schon gemeldet. Danke!'],
+    ['Has enviado varios informes en poco tiempo. Inténtalo más tarde.', "You've sent several reports in a short time. Please try again later.", 'Você enviou vários relatórios em pouco tempo. Tente mais tarde.', 'Du hast in kurzer Zeit mehrere Berichte gesendet. Versuche es später erneut.'],
+    ['No hay conexión a internet. Puedes copiar o descargar el informe.', 'No internet connection. You can copy or download the report.', 'Sem conexão com a internet. Você pode copiar ou baixar o relatório.', 'Keine Internetverbindung. Du kannst den Bericht kopieren oder herunterladen.'],
+    ['Ese email no parece válido', "That email doesn't look valid", 'Esse e-mail não parece válido', 'Diese E-Mail-Adresse scheint ungültig zu sein'],
   ];
   for (const [es, en, pt, de] of ROWS) { DICT.en[es] = en; DICT.pt[es] = pt; DICT.de[es] = de; }
 
