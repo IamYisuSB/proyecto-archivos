@@ -203,5 +203,302 @@
     return new Blob([...parts, ...central, end.buffer], { type: 'application/zip' });
   }
 
-  global.Encoders = { encodeBMP, encodeTIFF, encodeICO, makeZip };
+  /* ---------- GIF (estático, 256 colores) ---------- */
+
+  /* Paleta por corte de mediana sobre una muestra de píxeles opacos. */
+  function medianCut(data, maxColors) {
+    const total = data.length / 4;
+    const step = Math.max(1, Math.floor(total / 120000));
+    const samples = [];
+    for (let i = 0; i < total; i += step) {
+      const o = i * 4;
+      if (data[o + 3] >= 128) samples.push(data[o], data[o + 1], data[o + 2]);
+    }
+    const count = samples.length / 3;
+    if (!count) return [[0, 0, 0]];
+    const s = Uint8Array.from(samples);
+    const idx = new Uint32Array(count);
+    for (let i = 0; i < count; i++) idx[i] = i;
+
+    function stats(box) {
+      let lo = [255, 255, 255], hi = [0, 0, 0];
+      for (let i = box.start; i < box.end; i++) {
+        const o = idx[i] * 3;
+        for (let c = 0; c < 3; c++) {
+          const x = s[o + c];
+          if (x < lo[c]) lo[c] = x;
+          if (x > hi[c]) hi[c] = x;
+        }
+      }
+      const ranges = [hi[0] - lo[0], hi[1] - lo[1], hi[2] - lo[2]];
+      box.channel = ranges.indexOf(Math.max(...ranges));
+      box.range = ranges[box.channel];
+      return box;
+    }
+
+    const boxes = [stats({ start: 0, end: count })];
+    while (boxes.length < maxColors) {
+      let pick = -1, score = 0;
+      boxes.forEach((b, i) => {
+        const sc = b.range * (b.end - b.start);
+        if (b.end - b.start > 1 && b.range > 0 && sc > score) { score = sc; pick = i; }
+      });
+      if (pick < 0) break;
+      const b = boxes[pick];
+      const ch = b.channel;
+      idx.subarray(b.start, b.end).sort((x, y) => s[x * 3 + ch] - s[y * 3 + ch]);
+      const mid = (b.start + b.end) >> 1;
+      boxes.splice(pick, 1, stats({ start: b.start, end: mid }), stats({ start: mid, end: b.end }));
+    }
+
+    return boxes.map((b) => {
+      let r = 0, g = 0, bl = 0;
+      for (let i = b.start; i < b.end; i++) {
+        const o = idx[i] * 3;
+        r += s[o]; g += s[o + 1]; bl += s[o + 2];
+      }
+      const n = b.end - b.start;
+      return [Math.round(r / n), Math.round(g / n), Math.round(bl / n)];
+    });
+  }
+
+  function lzwEncode(indices, minCodeSize) {
+    const clearCode = 1 << minCodeSize;
+    const eoiCode = clearCode + 1;
+    const out = [];
+    let cur = 0, bits = 0;
+    let codeSize = minCodeSize + 1;
+    let nextCode = eoiCode + 1;
+    // Diccionario (prefijo, índice) → código, invalidado por "generación" en cada reinicio
+    const table = new Int16Array(4096 * 256);
+    const gen = new Uint32Array(4096 * 256);
+    let generation = 1;
+
+    function emit(code) {
+      cur |= code << bits;
+      bits += codeSize;
+      while (bits >= 8) { out.push(cur & 0xff); cur >>>= 8; bits -= 8; }
+    }
+
+    emit(clearCode);
+    let prefix = indices[0];
+    for (let i = 1; i < indices.length; i++) {
+      const k = indices[i];
+      const key = (prefix << 8) | k;
+      if (gen[key] === generation) {
+        prefix = table[key];
+        continue;
+      }
+      emit(prefix);
+      if (nextCode === 4096) {
+        emit(clearCode);
+        nextCode = eoiCode + 1;
+        codeSize = minCodeSize + 1;
+        generation++;
+      } else {
+        if (nextCode >= 1 << codeSize) codeSize++;
+        table[key] = nextCode++;
+        gen[key] = generation;
+      }
+      prefix = k;
+    }
+    emit(prefix);
+    emit(eoiCode);
+    if (bits > 0) out.push(cur & 0xff);
+    return out;
+  }
+
+  function encodeGIF(imageData) {
+    const { width: w, height: h, data } = imageData;
+    let transparent = false;
+    for (let i = 3; i < data.length; i += 4) if (data[i] < 128) { transparent = true; break; }
+
+    const palette = medianCut(data, transparent ? 255 : 256);
+    const transIndex = transparent ? palette.length : -1;
+
+    // Cada color (reducido a 15 bits) se busca una sola vez en la paleta
+    const cache = new Int16Array(32768).fill(-1);
+    const indices = new Uint8Array(w * h);
+    for (let i = 0, o = 0; i < indices.length; i++, o += 4) {
+      if (transparent && data[o + 3] < 128) { indices[i] = transIndex; continue; }
+      const r = data[o], g = data[o + 1], b = data[o + 2];
+      const key = ((r >> 3) << 10) | ((g >> 3) << 5) | (b >> 3);
+      let best = cache[key];
+      if (best < 0) {
+        let bestD = Infinity;
+        for (let p = 0; p < palette.length; p++) {
+          const c = palette[p];
+          const d = (c[0] - r) * (c[0] - r) * 2 + (c[1] - g) * (c[1] - g) * 4 + (c[2] - b) * (c[2] - b) * 3;
+          if (d < bestD) { bestD = d; best = p; }
+        }
+        cache[key] = best;
+      }
+      indices[i] = best;
+    }
+
+    const bytes = [];
+    const u16 = (n) => bytes.push(n & 0xff, (n >> 8) & 0xff);
+    for (const ch of 'GIF89a') bytes.push(ch.charCodeAt(0));
+    u16(w); u16(h);
+    bytes.push(0xf7, 0, 0); // tabla global de 256 colores
+    for (let p = 0; p < 256; p++) {
+      const c = palette[p] || [0, 0, 0];
+      bytes.push(c[0], c[1], c[2]);
+    }
+    if (transparent) bytes.push(0x21, 0xf9, 4, 0x01, 0, 0, transIndex, 0);
+    bytes.push(0x2c); u16(0); u16(0); u16(w); u16(h); bytes.push(0);
+    bytes.push(8);
+    const lzw = lzwEncode(indices, 8);
+    for (let i = 0; i < lzw.length; i += 255) {
+      const chunk = lzw.slice(i, i + 255);
+      bytes.push(chunk.length);
+      for (let j = 0; j < chunk.length; j++) bytes.push(chunk[j]);
+    }
+    bytes.push(0, 0x3b);
+    return new Blob([Uint8Array.from(bytes)], { type: 'image/gif' });
+  }
+
+  /* ---------- PDF (una imagen JPEG por página) ---------- */
+
+  const A4 = [595.28, 841.89];
+
+  /* pages: [{ jpeg: Blob, w, h }] · mode: 'fit' (página del tamaño de la imagen) o 'a4' */
+  async function makePDF(pages, mode) {
+    const enc = new TextEncoder();
+    const parts = [];
+    const offsets = [];
+    let pos = 0;
+    const push = (x) => {
+      const b = typeof x === 'string' ? enc.encode(x) : x;
+      parts.push(b);
+      pos += b.length;
+    };
+    const f = (n) => +n.toFixed(2);
+
+    push('%PDF-1.4\n%âãÏÓ\n');
+    const nObjects = 2 + pages.length * 3;
+    const kids = pages.map((_, i) => `${3 + i * 3} 0 R`).join(' ');
+
+    offsets[1] = pos; push('1 0 obj\n<< /Type /Catalog /Pages 2 0 R >>\nendobj\n');
+    offsets[2] = pos; push(`2 0 obj\n<< /Type /Pages /Kids [${kids}] /Count ${pages.length} >>\nendobj\n`);
+
+    for (let i = 0; i < pages.length; i++) {
+      const { jpeg, w, h } = pages[i];
+      const pageN = 3 + i * 3, contentN = pageN + 1, imageN = pageN + 2;
+      const iw = w * 0.75, ih = h * 0.75; // 96 ppp → puntos
+      let pw, ph, dw, dh, x, y;
+      if (mode === 'a4') {
+        [pw, ph] = w > h ? [A4[1], A4[0]] : A4;
+        const margin = 36;
+        const k = Math.min((pw - margin * 2) / iw, (ph - margin * 2) / ih);
+        dw = iw * k; dh = ih * k;
+        x = (pw - dw) / 2; y = (ph - dh) / 2;
+      } else {
+        pw = dw = iw; ph = dh = ih; x = y = 0;
+      }
+
+      offsets[pageN] = pos;
+      push(`${pageN} 0 obj\n<< /Type /Page /Parent 2 0 R /MediaBox [0 0 ${f(pw)} ${f(ph)}] ` +
+        `/Resources << /XObject << /Im0 ${imageN} 0 R >> >> /Contents ${contentN} 0 R >>\nendobj\n`);
+
+      const content = `q ${f(dw)} 0 0 ${f(dh)} ${f(x)} ${f(y)} cm /Im0 Do Q`;
+      offsets[contentN] = pos;
+      push(`${contentN} 0 obj\n<< /Length ${content.length} >>\nstream\n${content}\nendstream\nendobj\n`);
+
+      const bytes = new Uint8Array(await jpeg.arrayBuffer());
+      offsets[imageN] = pos;
+      push(`${imageN} 0 obj\n<< /Type /XObject /Subtype /Image /Width ${w} /Height ${h} ` +
+        `/ColorSpace /DeviceRGB /BitsPerComponent 8 /Filter /DCTDecode /Length ${bytes.length} >>\nstream\n`);
+      push(bytes);
+      push('\nendstream\nendobj\n');
+    }
+
+    const xref = pos;
+    let table = `xref\n0 ${nObjects + 1}\n0000000000 65535 f \n`;
+    for (let n = 1; n <= nObjects; n++) table += String(offsets[n]).padStart(10, '0') + ' 00000 n \n';
+    push(table);
+    push(`trailer\n<< /Size ${nObjects + 1} /Root 1 0 R >>\nstartxref\n${xref}\n%%EOF\n`);
+    return new Blob(parts, { type: 'application/pdf' });
+  }
+
+  /* ---------- AVIF con WebAssembly (para navegadores que no lo generan) ---------- */
+
+  const AVIF_URL = 'https://cdn.jsdelivr.net/npm/@jsquash/avif@2.1.1/codec/enc/avif_enc.js';
+
+  // speed 8: ~8 veces más rápido que el valor por defecto (6) con poca pérdida de compresión
+  const avifOptions = (quality) => ({
+    quality: Math.round(quality * 100), qualityAlpha: -1, denoiseLevel: 0,
+    tileColsLog2: 0, tileRowsLog2: 0, speed: 8, subsample: 1, chromaDeltaQ: false,
+    sharpness: 0, tune: 0, enableSharpYUV: false, bitDepth: 8, lossless: false,
+  });
+
+  /* Se codifica en un Worker para no congelar la página; si el navegador no
+   * permite crearlo, se hace en el hilo principal. Es un Worker clásico con
+   * import() dinámico porque los Worker de módulo no arrancan desde file://. */
+  const WORKER_SRC = `
+    let mod;
+    self.onmessage = async (e) => {
+      try {
+        mod = mod || await import('${AVIF_URL}').then((m) => m.default({ noInitialRun: true }));
+        const { data, width, height, options } = e.data;
+        const out = mod.encode(new Uint8Array(data), width, height, options);
+        if (!out) throw new Error('Error al codificar AVIF');
+        const copy = out.slice();
+        self.postMessage({ ok: true, buf: copy.buffer }, [copy.buffer]);
+      } catch (err) {
+        self.postMessage({ ok: false, msg: String(err && err.message || err) });
+      }
+    };`;
+
+  let avifWorker = null;
+  let avifMain = null;
+  let avifQueue = Promise.resolve();
+
+  function avifInWorker(imageData, options) {
+    if (!avifWorker) {
+      const url = URL.createObjectURL(new Blob([WORKER_SRC], { type: 'text/javascript' }));
+      avifWorker = new Worker(url);
+    }
+    return new Promise((res, rej) => {
+      const w = avifWorker;
+      w.onmessage = (e) => (e.data.ok ? res(e.data.buf) : rej(new Error(e.data.msg)));
+      w.onerror = (e) => { e.preventDefault(); rej(new Error('worker')); };
+      const copy = imageData.data.slice();
+      w.postMessage({ data: copy.buffer, width: imageData.width, height: imageData.height, options }, [copy.buffer]);
+    });
+  }
+
+  async function avifInMain(imageData, options) {
+    if (!avifMain) {
+      avifMain = import(AVIF_URL)
+        .then((m) => m.default({ noInitialRun: true }))
+        .catch((e) => { avifMain = null; throw e; });
+    }
+    const mod = await avifMain;
+    const out = mod.encode(new Uint8Array(imageData.data.buffer), imageData.width, imageData.height, options);
+    if (!out) throw new Error('Error al codificar AVIF');
+    return out;
+  }
+
+  function encodeAVIF(imageData, quality) {
+    const options = avifOptions(quality);
+    const job = avifQueue.then(async () => {
+      let out;
+      if (avifWorker !== false) {
+        try {
+          out = await avifInWorker(imageData, options);
+        } catch (e) {
+          if (e.message !== 'worker') throw e;
+          if (avifWorker) avifWorker.terminate();
+          avifWorker = false; // el Worker no arranca aquí: se usa el hilo principal
+        }
+      }
+      if (!out) out = await avifInMain(imageData, options);
+      return new Blob([out], { type: 'image/avif' });
+    });
+    avifQueue = job.catch(() => {});
+    return job;
+  }
+
+  global.Encoders = { encodeBMP, encodeTIFF, encodeICO, encodeGIF, encodeAVIF, makePDF, makeZip };
 })(window);

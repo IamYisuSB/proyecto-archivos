@@ -32,17 +32,24 @@ Leyenda: ✅ hecho · 🔜 siguiente · 🧭 más adelante · 💡 idea a valora
 
 ---
 
-## Fase 2: más formatos 🔜
+## Fase 2: más formatos ✅ (casi completa)
 
-**Objetivo:** leer y generar los formatos que hoy fallan. Es lo más pedido en un conversor.
+**Objetivo:** leer y generar los formatos que antes fallaban. Es lo más pedido en un conversor.
 
-- 🔜 **Leer HEIC/HEIF** (fotos de iPhone), con un decodificador WebAssembly cargado solo cuando haga falta.
-- 🔜 **Generar AVIF en todos los navegadores** con un codificador WASM (hoy depende del navegador).
-- 🔜 **Leer TIFF** en Chrome, Edge y Firefox (hoy solo lo lee Safari).
-- 🔜 **Exportar a GIF** (estático) y **a PDF** (una imagen por página o todas en un solo PDF).
-- 🧭 **Leer RAW** de cámara (CR2, NEF, ARW, DNG) usando la vista previa incrustada.
-- 🧭 **Leer PSD** (capa combinada).
-- 🧭 **GIF animado → WebP animado / MP4**.
+- ✅ **Leer HEIC/HEIF** (fotos de iPhone) con heic2any (libheif en WebAssembly).
+- ✅ **Generar AVIF en todos los navegadores.** Si el navegador no sabe, se usa el codificador de Squoosh (`@jsquash/avif`) en un Web Worker, para que la página no se congele.
+- ✅ **Leer TIFF** en todos los navegadores con UTIF.js (sin compresión, LZW, Deflate, PackBits…). Solo se lee la primera página.
+- ✅ **Exportar a GIF** estático, con paleta de 256 colores por corte de mediana y transparencia.
+- ✅ **Exportar a PDF:** una imagen por página o todas en un solo PDF, con página del tamaño de la imagen o A4.
+- ✅ **Leer RAW** de cámara (CR2, CR3, NEF, ARW, DNG, ORF, RW2, RAF…) a partir de la vista previa JPEG más grande que trae el archivo, girada según la orientación de la cámara.
+- ✅ **Leer PSD/PSB** (imagen combinada, 8 bits, RGB o escala de grises, con transparencia).
+- 🧭 **GIF animado → WebP animado / MP4** (pendiente).
+
+**Notas técnicas**
+- HEIC, TIFF y AVIF (en navegadores sin AVIF propio) descargan su librería del CDN jsDelivr **solo la primera vez que se usan**. El resto de la app funciona sin conexión.
+- RAW: la calidad depende de la vista previa que guarde la cámara (normalmente a resolución completa o casi). No se revela el RAW.
+- PSD: no se admiten los modos CMYK, Lab, 16 y 32 bits.
+- Mejoras pendientes de esta fase: TIFF multipágina (todas las páginas), PSD en CMYK y revelado RAW real.
 
 ## Fase 3: mejor compresión y edición 🧭
 

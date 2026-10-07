@@ -12,6 +12,8 @@
     { id: 'jpeg', label: 'JPG', mime: 'image/jpeg', ext: 'jpg', lossy: true, alpha: false, desc: 'El más compatible. Perfecto para fotos.' },
     { id: 'png', label: 'PNG', mime: 'image/png', ext: 'png', lossy: false, alpha: true, desc: 'Sin pérdida y con transparencia. Logos, capturas, gráficos.' },
     { id: 'avif', label: 'AVIF', mime: 'image/avif', ext: 'avif', lossy: true, alpha: true, desc: 'La máxima compresión moderna.' },
+    { id: 'gif', label: 'GIF', ext: 'gif', custom: true, lossy: false, alpha: true, desc: 'Compatible con todo, pero limitado a 256 colores. Bien para gráficos sencillos, no para fotos.' },
+    { id: 'pdf', label: 'PDF', ext: 'pdf', custom: true, lossy: true, alpha: false, desc: 'Documento PDF con una imagen por página, o todas juntas en un solo PDF.' },
     { id: 'bmp', label: 'BMP', ext: 'bmp', custom: true, lossy: false, alpha: false, desc: 'Mapa de bits sin comprimir. Para programas antiguos.' },
     { id: 'tiff', label: 'TIFF', ext: 'tiff', custom: true, lossy: false, alpha: true, desc: 'Sin pérdida. Para impresión y archivo.' },
     { id: 'ico', label: 'ICO', ext: 'ico', custom: true, lossy: false, alpha: true, desc: 'Icono de Windows / favicon con varios tamaños (16–256 px).' },
@@ -20,8 +22,10 @@
   const MIME_TO_FMT = {
     'image/webp': 'webp', 'image/jpeg': 'jpeg', 'image/png': 'png', 'image/avif': 'avif',
     'image/bmp': 'bmp', 'image/x-ms-bmp': 'bmp', 'image/tiff': 'tiff',
-    'image/x-icon': 'ico', 'image/vnd.microsoft.icon': 'ico',
+    'image/x-icon': 'ico', 'image/vnd.microsoft.icon': 'ico', 'image/gif': 'gif',
   };
+  // Formato de salida con "Original" para lo que solo se puede leer
+  const KIND_TO_FMT = { heic: 'jpeg', raw: 'jpeg', psd: 'png', tiff: 'tiff' };
 
   const RATIOS = [
     { id: 'none', label: 'Sin recorte' },
@@ -46,6 +50,7 @@
     format: 'webp', quality: 82, targetOn: false, targetKB: 200,
     resizeMode: 'none', percent: 50, maxW: 1920, maxH: 1920, exactW: 1080, exactH: 1080, cover: true,
     cropRatio: 'none', bg: '#ffffff', pattern: '{nombre}',
+    pdfMerge: true, pdfPage: 'fit',
   };
   const STORE_KEY = 'pixelote.settings.v1';
 
@@ -55,6 +60,8 @@
   let version = 0; // sube cada vez que cambian los ajustes
   const items = [];
   const supported = {};
+  let nativeAvif = false;
+  const pdfPages = new WeakMap(); // PDF de una página → su JPEG, para unirlos después
   let busy = false;
   let nextId = 1;
 
@@ -119,14 +126,18 @@
         supported[f.id] = !!b && b.type === f.mime;
       } catch (_) { supported[f.id] = false; }
     }
+    // Si el navegador no genera AVIF, se usa el codificador WebAssembly
+    nativeAvif = supported.avif;
+    supported.avif = true;
+    if (!nativeAvif) FMT.avif.desc += ' Este navegador no lo genera, así que se descargará un codificador la primera vez (y es más lento).';
   }
 
   /* Formato real de salida para una imagen (resuelve "Original"). */
   function outFormat(it) {
     if (settings.format !== 'original') return FMT[settings.format];
-    const id = MIME_TO_FMT[it.file.type];
+    const id = MIME_TO_FMT[it.file.type] || KIND_TO_FMT[it.kind];
     if (id && supported[id]) return FMT[id];
-    return FMT.png; // GIF, SVG, HEIC… → PNG para no perder transparencia
+    return FMT.png; // SVG y otros → PNG para no perder transparencia
   }
 
   /* ---------- Geometría ---------- */
@@ -188,9 +199,18 @@
   }
 
   async function encode(canvas, fmt, q) {
-    if (fmt.id === 'bmp') return Encoders.encodeBMP(canvas.getContext('2d').getImageData(0, 0, canvas.width, canvas.height));
-    if (fmt.id === 'tiff') return Encoders.encodeTIFF(canvas.getContext('2d').getImageData(0, 0, canvas.width, canvas.height));
+    const pixels = () => canvas.getContext('2d').getImageData(0, 0, canvas.width, canvas.height);
+    if (fmt.id === 'bmp') return Encoders.encodeBMP(pixels());
+    if (fmt.id === 'tiff') return Encoders.encodeTIFF(pixels());
+    if (fmt.id === 'gif') return Encoders.encodeGIF(pixels());
     if (fmt.id === 'ico') return Encoders.encodeICO(canvas);
+    if (fmt.id === 'avif' && !nativeAvif) return Encoders.encodeAVIF(pixels(), q);
+    if (fmt.id === 'pdf') {
+      const page = { jpeg: await canvasToBlob(canvas, 'image/jpeg', q), w: canvas.width, h: canvas.height };
+      const pdf = await Encoders.makePDF([page], settings.pdfPage);
+      pdfPages.set(pdf, page);
+      return pdf;
+    }
     return canvasToBlob(canvas, fmt.mime, fmt.lossy ? q : undefined);
   }
 
@@ -251,12 +271,31 @@
     });
   }
 
+  /* Primero el navegador; si no puede, el decodificador del formato. */
+  async function openFile(it) {
+    try { return await loadImage(it.file); } catch (_) { /* sigue */ }
+    if (!it.kind) throw new Error('Tu navegador no puede leer este archivo');
+    const label = Codecs.LABELS[it.kind];
+    it.loadingMsg = `Decodificando ${label}…`;
+    updateCard(it);
+    let blob;
+    try {
+      blob = await Codecs.decode(it.file, it.kind);
+    } catch (e) {
+      console.error(e);
+      if (/descargar/.test(e.message) || !navigator.onLine) throw new Error(`Para leer ${label} hace falta internet la primera vez`);
+      const detail = /^(Solo|Compresión|Este RAW)/.test(e.message) ? `: ${e.message.charAt(0).toLowerCase()}${e.message.slice(1)}` : '';
+      throw new Error(`No se pudo leer este ${label}${detail}`);
+    }
+    return loadImage(blob);
+  }
+
   async function addFiles(fileList) {
-    const files = Array.from(fileList).filter((f) => f.type.startsWith('image/') || /\.(heic|heif|tiff?|bmp|ico|svg|avif|webp)$/i.test(f.name));
+    const files = Array.from(fileList).filter((f) => f.type.startsWith('image/') || Codecs.kindOf(f) || /\.(bmp|ico|svg|avif|webp)$/i.test(f.name));
     if (!files.length) { toast('No he encontrado imágenes en lo que has soltado'); return; }
 
     for (const file of files) {
-      const it = { id: nextId++, file, status: 'loading', crop: null, result: null };
+      const it = { id: nextId++, file, kind: Codecs.kindOf(file), status: 'loading', crop: null, result: null };
       items.push(it);
       it.el = createCard(it);
       $('#grid').appendChild(it.el);
@@ -265,13 +304,14 @@
 
     for (const it of items.filter((i) => i.status === 'loading')) {
       try {
-        const { img, url } = await loadImage(it.file);
+        const { img, url } = await openFile(it);
         it.img = img; it.url = url;
         it.w = img.naturalWidth || 1024;
         it.h = img.naturalHeight || 1024;
         it.status = 'ready';
-      } catch (_) {
+      } catch (e) {
         it.status = 'invalid';
+        it.errorMsg = e.message;
       }
       updateCard(it);
     }
@@ -314,17 +354,16 @@
 
     if (it.status === 'loading') {
       li.className = 'item loading';
-      li.innerHTML = `<div class="thumb skeleton"></div><div class="meta"><div class="name" title="${name}">${name}</div><div class="sub">Cargando…</div></div>`;
+      li.innerHTML = `<div class="thumb skeleton"></div><div class="meta"><div class="name" title="${name}">${name}</div><div class="sub">${esc(it.loadingMsg || 'Cargando…')}</div></div>`;
       return;
     }
     if (it.status === 'invalid') {
-      const heic = /\.(heic|heif)$/i.test(it.file.name);
       li.className = 'item invalid';
       li.innerHTML = `
         <div class="thumb broken" aria-hidden="true">⚠</div>
         <div class="meta">
           <div class="name" title="${name}">${name}</div>
-          <div class="sub err">${heic ? 'HEIC aún no es compatible en este navegador' : 'Tu navegador no puede leer este archivo'}</div>
+          <div class="sub err">${esc(it.errorMsg || 'Tu navegador no puede leer este archivo')}</div>
         </div>
         <button class="icon-btn rm" data-act="remove" title="Quitar" aria-label="Quitar">✕</button>`;
       return;
@@ -365,7 +404,7 @@
       </div>
       <div class="meta">
         <div class="name" title="${name}">${name}</div>
-        <div class="sub">${it.w}×${it.h} · ${origSize}</div>
+        <div class="sub">${it.kind ? `<span class="src-tag">${Codecs.LABELS[it.kind]}</span> ` : ''}${it.w}×${it.h} · ${origSize}</div>
         <div class="sub arrow">→ ${g.dw}×${g.dh} · ${esc(fmt.label)}</div>
       </div>
       ${resultHtml}`;
@@ -392,7 +431,8 @@
 
     const done = items.filter((i) => i.result && i.result.version === version);
     $('#zipBtn').disabled = busy || done.length === 0;
-    $('#zipLabel').textContent = done.length > 1 ? `Descargar todo (.zip)` : 'Descargar';
+    $('#zipLabel').textContent = done.length <= 1 ? 'Descargar'
+      : mergePdf(done) ? `Descargar PDF único (${done.length} páginas)` : 'Descargar todo (.zip)';
 
     const sum = $('#summary');
     if (done.length && !busy) {
@@ -472,14 +512,23 @@
     setTimeout(() => URL.revokeObjectURL(url), 4000);
   }
 
+  function mergePdf(done) {
+    return settings.format === 'pdf' && settings.pdfMerge && done.every((i) => pdfPages.has(i.result.blob));
+  }
+
   async function downloadAll() {
     const done = items.filter((i) => i.result && i.result.version === version);
     if (!done.length) return;
     if (done.length === 1) { download(done[0].result.blob, done[0].result.name); return; }
     const btn = $('#zipBtn');
     btn.disabled = true;
-    $('#zipLabel').textContent = 'Creando ZIP…';
+    const merge = mergePdf(done);
+    $('#zipLabel').textContent = merge ? 'Creando PDF…' : 'Creando ZIP…';
     try {
+      if (merge) {
+        download(await Encoders.makePDF(done.map((i) => pdfPages.get(i.result.blob)), settings.pdfPage), 'imagenes-pixelote.pdf');
+        return;
+      }
       const zip = await Encoders.makeZip(uniqueNames(done.map((i) => ({ name: i.result.name, blob: i.result.blob }))));
       download(zip, 'imagenes-pixelote.zip');
     } finally {
@@ -523,6 +572,13 @@
       changed();
     });
 
+    $('#pdfPage').addEventListener('click', (e) => {
+      const b = e.target.closest('button');
+      if (!b) return;
+      settings.pdfPage = b.dataset.v;
+      changed();
+    });
+
     $('#resizeMode').addEventListener('click', (e) => {
       const b = e.target.closest('button');
       if (!b) return;
@@ -537,7 +593,7 @@
         changed(true);
       });
     }
-    for (const key of ['targetOn', 'cover']) {
+    for (const key of ['targetOn', 'cover', 'pdfMerge']) {
       $('#' + key).addEventListener('change', (e) => { settings[key] = e.target.checked; changed(); });
     }
     $('#bg').addEventListener('input', (e) => { settings.bg = e.target.value; changed(true); });
@@ -556,6 +612,9 @@
     $$('#formats .fmt').forEach((b) => b.setAttribute('aria-checked', b.dataset.v === s.format));
     $$('#ratios .chip').forEach((b) => b.setAttribute('aria-checked', b.dataset.v === s.cropRatio));
     $$('#resizeMode button').forEach((b) => b.setAttribute('aria-checked', b.dataset.v === s.resizeMode));
+    $$('#pdfPage button').forEach((b) => b.setAttribute('aria-checked', b.dataset.v === s.pdfPage));
+    $('#pdfOptions').hidden = s.format !== 'pdf';
+    $('#pdfMerge').checked = s.pdfMerge;
     $$('.mode-body').forEach((el) => { el.hidden = el.dataset.mode !== s.resizeMode; });
     $('[data-mode-hint="none"]').hidden = s.resizeMode !== 'none';
 

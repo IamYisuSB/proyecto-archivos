@@ -29,7 +29,7 @@
     <!-- Zona de imágenes -->
     <section class="workspace" aria-label="Imágenes">
       <label class="dropzone" id="dropzone" tabindex="0">
-        <input type="file" id="fileInput" accept="image/*,.heic,.heif,.tif,.tiff,.bmp,.ico,.svg" multiple hidden>
+        <input type="file" id="fileInput" accept="image/*,.heic,.heif,.tif,.tiff,.bmp,.ico,.svg,.psd,.dng,.cr2,.cr3,.nef,.nrw,.arw,.orf,.rw2,.raf,.pef,.srw" multiple hidden>
         <div class="dz-icon" aria-hidden="true">
           <svg viewBox="0 0 48 48"><path d="M24 31V11m0 0l-8 8m8-8l8 8" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/><path d="M8 30v6a4 4 0 004 4h24a4 4 0 004-4v-6" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round"/></svg>
         </div>
@@ -37,7 +37,7 @@
           <strong>Arrastra tus imágenes aquí</strong>
           <span>o <u>haz clic para elegirlas</u> · también puedes pegar con Ctrl+V</span>
         </div>
-        <div class="dz-formats">JPG · PNG · WebP · AVIF · GIF · BMP · SVG · ICO</div>
+        <div class="dz-formats">JPG · PNG · WebP · AVIF · HEIC · TIFF · GIF · BMP · SVG · ICO · PSD · RAW</div>
       </label>
 
       <div class="toolbar" id="toolbar" hidden>
@@ -65,6 +65,16 @@
           <h2><span class="step">1</span> Formato de salida</h2>
           <div class="formats" id="formats" role="radiogroup" aria-label="Formato de salida"></div>
           <p class="hint" id="formatHint"></p>
+          <div class="fmt-options" id="pdfOptions" hidden>
+            <label class="check"><input type="checkbox" id="pdfMerge"> <span>Unir todas en un solo PDF</span></label>
+            <div class="row between">
+              <span class="tiny muted">Tamaño de página</span>
+              <div class="segmented two" id="pdfPage" role="radiogroup" aria-label="Tamaño de página">
+                <button type="button" data-v="fit">Como la imagen</button>
+                <button type="button" data-v="a4">A4</button>
+              </div>
+            </div>
+          </div>
         </section>
 
         <section class="card-section">
@@ -186,6 +196,7 @@
   <div class="toast" id="toast" role="status" aria-live="polite"></div>
 
   <script src="encoders.js"></script>
+  <script src="decoders.js"></script>
   <script src="app.js"></script>
 </body>
 </html>
