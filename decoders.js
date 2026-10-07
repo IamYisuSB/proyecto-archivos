@@ -140,5 +140,5 @@
     return DECODERS[kind](file);
   }
 
-  global.Codecs = { kindOf, decode, loadScript, LABELS, RAW_EXT };
+  global.Codecs = { kindOf, decode, loadScript, LABELS, RAW_EXT, CDN_FILES: Object.values(CDN) };
 })(window);

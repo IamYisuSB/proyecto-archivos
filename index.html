@@ -5,8 +5,14 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Pixelote · Conversor de imágenes</title>
   <meta name="description" content="Convierte, comprime, redimensiona y recorta imágenes por lotes. Todo en tu navegador, sin subir nada.">
+  <meta name="theme-color" content="#5b5bd6">
   <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><rect width='32' height='32' rx='8' fill='%235b5bd6'/><path d='M8 22l5-6 4 4 3-3 4 5z' fill='white'/><circle cx='21' cy='11' r='2.5' fill='white'/></svg>">
+  <link rel="apple-touch-icon" href="icons/icon-192.png">
   <link rel="stylesheet" href="styles.css">
+  <script>
+    // Tema elegido con el botón, antes de pintar para que no parpadee
+    try { var th = localStorage.getItem('pixelote.theme'); if (th) document.documentElement.dataset.theme = th; } catch (e) {}
+  </script>
 </head>
 <body>
   <header class="topbar">
@@ -19,35 +25,54 @@
         <p>Convierte, comprime, redimensiona y recorta imágenes por lotes</p>
       </div>
     </div>
-    <div class="privacy" title="El procesamiento ocurre en tu dispositivo">
-      <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2l8 3v6c0 5-3.4 9.3-8 11-4.6-1.7-8-6-8-11V5z" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/><path d="M8.5 12l2.5 2.5 4.5-5" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
-      Tus imágenes no salen de tu equipo
+    <div class="top-actions">
+      <div class="privacy" title="El procesamiento ocurre en tu dispositivo">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2l8 3v6c0 5-3.4 9.3-8 11-4.6-1.7-8-6-8-11V5z" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/><path d="M8.5 12l2.5 2.5 4.5-5" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        <span>Tus imágenes no salen de tu equipo</span>
+      </div>
+      <button class="btn ghost small" id="installBtn" type="button" hidden>⬇ Instalar app</button>
+      <select id="lang" class="lang-select" aria-label="Idioma">
+        <option value="es">ES</option>
+        <option value="en">EN</option>
+        <option value="pt">PT</option>
+      </select>
+      <button class="icon-toggle" id="themeBtn" type="button"></button>
     </div>
   </header>
 
   <main class="layout">
     <!-- Zona de imágenes -->
     <section class="workspace" aria-label="Imágenes">
+      <div class="banner" id="sharedBanner" hidden>
+        <span id="sharedText"></span>
+        <span class="spacer"></span>
+        <button class="btn small primary" id="sharedAdd" type="button">Añadir a mis atajos</button>
+        <button class="btn small ghost" id="sharedIgnore" type="button">Ignorar</button>
+      </div>
+
       <label class="dropzone" id="dropzone" tabindex="0">
         <input type="file" id="fileInput" accept="image/*,.heic,.heif,.tif,.tiff,.bmp,.ico,.svg,.dng,.cr2,.cr3,.nef,.nrw,.arw,.orf,.rw2,.raf,.pef,.srw" multiple hidden>
         <div class="dz-icon" aria-hidden="true">
           <svg viewBox="0 0 48 48"><path d="M24 31V11m0 0l-8 8m8-8l8 8" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/><path d="M8 30v6a4 4 0 004 4h24a4 4 0 004-4v-6" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round"/></svg>
         </div>
         <div class="dz-text">
-          <strong>Arrastra tus imágenes aquí</strong>
+          <strong>Arrastra tus imágenes o carpetas aquí</strong>
           <span>o <u>haz clic para elegirlas</u> · también puedes pegar con Ctrl+V</span>
         </div>
         <div class="dz-formats">JPG · PNG · WebP · AVIF · HEIC · TIFF · GIF · BMP · SVG · ICO · RAW</div>
       </label>
+      <input type="file" id="folderInput" webkitdirectory multiple hidden>
 
       <div class="toolbar" id="toolbar" hidden>
         <div class="toolbar-info" id="toolbarInfo"></div>
         <div class="toolbar-actions">
-          <button class="btn ghost" id="rotateAllBtn" type="button" title="Girar todas 90°">⟳ Girar todas</button>
+          <button class="btn ghost" id="rotateAllBtn" type="button">⟳ Girar todas</button>
+          <button class="btn ghost" id="folderBtn" type="button">📁 Añadir carpeta</button>
           <button class="btn ghost" id="addMoreBtn" type="button">+ Añadir más</button>
           <button class="btn ghost danger" id="clearBtn" type="button">Vaciar</button>
         </div>
       </div>
+      <p class="hint reorder-hint" id="reorderHint" hidden>Arrastra las imágenes para cambiar el orden (se usa en la numeración y en el PDF).</p>
 
       <div class="summary" id="summary" hidden></div>
 
@@ -60,6 +85,17 @@
         <section class="card-section">
           <h2>Atajos rápidos</h2>
           <div class="presets" id="presets"></div>
+          <div class="my-presets" id="myPresets"></div>
+          <div class="preset-actions" id="presetActions">
+            <button class="btn ghost small" id="savePresetBtn" type="button">＋ Guardar ajustes actuales</button>
+            <button class="btn ghost small" id="importPresetBtn" type="button">Importar</button>
+            <input type="file" id="presetFile" accept=".json,application/json" hidden>
+          </div>
+          <form class="save-preset" id="savePresetForm" hidden>
+            <input type="text" id="presetName" maxlength="40" placeholder="Nombre del atajo" required>
+            <button class="btn primary small" type="submit">Guardar</button>
+            <button class="btn ghost small" type="button" id="cancelPresetBtn">Cancelar</button>
+          </form>
         </section>
 
         <section class="card-section highlight">
@@ -127,11 +163,12 @@
 
         <section class="card-section">
           <h2><span class="step">3</span> Tamaño</h2>
-          <div class="segmented" id="resizeMode" role="radiogroup" aria-label="Modo de redimensionado">
+          <div class="segmented five" id="resizeMode" role="radiogroup" aria-label="Modo de redimensionado">
             <button type="button" data-v="none">Original</button>
             <button type="button" data-v="percent">%</button>
             <button type="button" data-v="max">Máximo</button>
             <button type="button" data-v="exact">Exacto</button>
+            <button type="button" data-v="multi">Varios</button>
           </div>
           <div class="mode-body" data-mode="percent">
             <div class="row between"><label for="percent">Escala</label><output id="percentOut" class="pill"></output></div>
@@ -155,6 +192,13 @@
             </div>
             <label class="check"><input type="checkbox" id="cover"> <span>Recortar para no deformar</span></label>
           </div>
+          <div class="mode-body" data-mode="multi">
+            <label class="field">
+              <span>Anchos (px), separados por comas</span>
+              <input type="text" id="multiW" inputmode="numeric" spellcheck="false">
+            </label>
+            <p class="hint">Crea una copia de cada imagen en cada ancho, para webs adaptables (srcset). Nunca agranda.</p>
+          </div>
           <p class="hint" data-mode-hint="none">Se mantienen las dimensiones originales.</p>
         </section>
 
@@ -162,6 +206,49 @@
           <h2><span class="step">4</span> Recorte</h2>
           <div class="chips" id="ratios" role="radiogroup" aria-label="Proporción de recorte"></div>
           <p class="hint">Recorta todas al centro. Para elegir la zona exacta, girar o voltear, pulsa <b>✂</b> en cada imagen (o <b>⟳</b> para girarla).</p>
+        </section>
+
+        <section class="card-section">
+          <h2><span class="step">5</span> Marca de agua <small class="muted optional">(opcional)</small></h2>
+          <label class="check first"><input type="checkbox" id="wmOn"> <span>Añadir marca de agua</span></label>
+          <div id="wmBody" class="wm-body">
+            <div class="segmented two wide" id="wmType" role="radiogroup" aria-label="Tipo de marca de agua">
+              <button type="button" data-v="text">Texto</button>
+              <button type="button" data-v="logo">Logo</button>
+            </div>
+            <div id="wmTextRow" class="wm-row">
+              <input type="text" id="wmText" maxlength="80" class="text-input" aria-label="Texto de la marca de agua">
+              <input type="color" id="wmColor" aria-label="Color del texto">
+            </div>
+            <div id="wmLogoRow" class="wm-row">
+              <img id="wmLogoPreview" alt="" hidden>
+              <button class="btn ghost small" id="wmLogoBtn" type="button">Elegir logo…</button>
+              <button class="btn ghost small danger" id="wmLogoClear" type="button" hidden>Quitar</button>
+              <input type="file" id="wmLogoFile" accept="image/*" hidden>
+            </div>
+            <div class="wm-grid">
+              <div>
+                <span class="tiny muted">Posición</span>
+                <div class="pos-grid" id="wmPos" role="radiogroup" aria-label="Posición">
+                  <button type="button" data-v="tl" aria-label="Arriba a la izquierda"></button>
+                  <button type="button" data-v="tc" aria-label="Arriba al centro"></button>
+                  <button type="button" data-v="tr" aria-label="Arriba a la derecha"></button>
+                  <button type="button" data-v="ml" aria-label="Centro a la izquierda"></button>
+                  <button type="button" data-v="mc" aria-label="Centro"></button>
+                  <button type="button" data-v="mr" aria-label="Centro a la derecha"></button>
+                  <button type="button" data-v="bl" aria-label="Abajo a la izquierda"></button>
+                  <button type="button" data-v="bc" aria-label="Abajo al centro"></button>
+                  <button type="button" data-v="br" aria-label="Abajo a la derecha"></button>
+                  <button type="button" data-v="tile" class="tile">Mosaico</button>
+                </div>
+              </div>
+              <canvas id="wmPreview" class="wm-preview" width="200" height="140"></canvas>
+            </div>
+            <div class="row between"><label for="wmSize">Tamaño</label><output id="wmSizeOut" class="pill"></output></div>
+            <input type="range" id="wmSize" min="2" max="30" step="1">
+            <div class="row between"><label for="wmOpacity">Opacidad</label><output id="wmOpacityOut" class="pill"></output></div>
+            <input type="range" id="wmOpacity" min="10" max="100" step="5">
+          </div>
         </section>
 
         <details class="card-section advanced">
@@ -185,6 +272,11 @@
               </div>
               <small id="metaHint"></small>
             </div>
+            <div class="field" id="offlineRow" hidden>
+              <span>Uso sin conexión</span>
+              <button type="button" class="btn ghost small" id="offlineBtn">Descargar códecs (HEIC, TIFF, AVIF, MozJPEG)</button>
+              <small>Así podrás leer y crear todos los formatos aunque no tengas internet.</small>
+            </div>
             <button type="button" class="btn ghost small" id="resetBtn">Restablecer ajustes</button>
           </div>
         </details>
@@ -197,6 +289,7 @@
           <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 4v11m0 0l-4.5-4.5M12 15l4.5-4.5M5 20h14" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg>
           <span id="zipLabel">Descargar todo</span>
         </button>
+        <button class="btn ghost small folder-save" id="saveFolderBtn" type="button" disabled hidden>📁 <span>Guardar en carpeta</span></button>
       </div>
     </aside>
   </main>
@@ -267,8 +360,61 @@
     </form>
   </dialog>
 
+  <!-- Ajustes propios de una imagen -->
+  <dialog id="itemDialog" class="small-dialog">
+    <form method="dialog" class="small-inner" id="itemForm">
+      <h2>Ajustes de esta imagen</h2>
+      <p class="muted" id="itemName"></p>
+      <label class="field">
+        <span>Formato</span>
+        <select id="ovFormat" class="text-input"></select>
+      </label>
+      <label class="check"><input type="checkbox" id="ovQualityOn"> <span>Calidad propia</span> <output id="ovQualityOut" class="pill"></output></label>
+      <input type="range" id="ovQuality" min="1" max="100" step="1">
+      <label class="field">
+        <span>Ancho máximo (px)</span>
+        <input type="number" id="ovMaxW" min="1" class="text-input" placeholder="Igual que el resto">
+      </label>
+      <div class="field">
+        <span>Orden</span>
+        <div class="move-row" id="moveRow">
+          <button type="button" class="btn ghost small" data-move="first">⇤ Primera</button>
+          <button type="button" class="btn ghost small" data-move="-1">← Antes</button>
+          <button type="button" class="btn ghost small" data-move="1">Después →</button>
+          <button type="button" class="btn ghost small" data-move="last">Última ⇥</button>
+        </div>
+      </div>
+      <footer class="small-foot">
+        <button type="button" class="btn ghost danger small" id="ovClear">Usar ajustes generales</button>
+        <span class="spacer"></span>
+        <button type="submit" class="btn ghost small" value="cancel">Cancelar</button>
+        <button type="button" class="btn primary small" id="ovApply">Aplicar</button>
+      </footer>
+    </form>
+  </dialog>
+
+  <!-- Compartir un atajo -->
+  <dialog id="shareDialog" class="small-dialog">
+    <form method="dialog" class="small-inner">
+      <h2>Compartir atajo</h2>
+      <p class="muted" id="shareName"></p>
+      <label class="field">
+        <span>Enlace</span>
+        <input type="text" id="shareLink" class="text-input" readonly>
+      </label>
+      <small class="muted">Quien abra el enlace podrá añadir el atajo a los suyos. También puedes enviar el archivo.</small>
+      <footer class="small-foot">
+        <button type="button" class="btn ghost small" id="shareFile">Descargar archivo</button>
+        <span class="spacer"></span>
+        <button type="button" class="btn primary small" id="shareCopy">Copiar enlace</button>
+        <button type="submit" class="btn ghost small" value="close">Cerrar</button>
+      </footer>
+    </form>
+  </dialog>
+
   <div class="toast" id="toast" role="status" aria-live="polite"></div>
 
+  <script src="i18n.js"></script>
   <script src="encoders.js"></script>
   <script src="pipeline.js"></script>
   <script src="decoders.js"></script>

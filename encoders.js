@@ -842,6 +842,8 @@ function PixeloteEncoders(global) {
     makeCanvas, canvasToBlob,
     encodeBMP, encodeTIFF, encodeICO, encodeGIF, encodePNG8, wasmEncode, makePDF, makeZip,
     readJpegExif, exifHasGps, cleanExif, injectExif,
+    // Archivos de los códecs, para descargarlos y usar la app sin conexión
+    WASM_FILES: Object.values(WASM).flatMap((c) => [c.url, c.url.replace(/\.js$/, '.wasm')]),
   };
 }
 

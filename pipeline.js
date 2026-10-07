@@ -26,6 +26,68 @@ function PixelotePipeline(Encoders) {
     return out;
   }
 
+  function isLight(hex) {
+    const n = parseInt(String(hex).replace('#', ''), 16) || 0;
+    return ((n >> 16) & 255) * 0.299 + ((n >> 8) & 255) * 0.587 + (n & 255) * 0.114 > 150;
+  }
+
+  /* Marca de agua opcional: texto o logo, en una de 9 posiciones o en mosaico.
+   * Su tamaño es relativo al lado menor, así se ve igual en cualquier resolución. */
+  function applyWatermark(canvas, wm) {
+    const ctx = canvas.getContext('2d');
+    const W = canvas.width, H = canvas.height;
+    const base = Math.min(W, H);
+    const unit = Math.max(6, (base * wm.size) / 100);
+    const font = (px) => `600 ${px}px system-ui, -apple-system, "Segoe UI", Roboto, sans-serif`;
+    let mw, mh, paint;
+
+    if (wm.type === 'logo') {
+      if (!wm.logo) return;
+      const lw = wm.logo.width, lh = wm.logo.height;
+      mh = unit * 1.6;
+      mw = (mh * lw) / lh;
+      if (mw > W * 0.9) { mw = W * 0.9; mh = (mw * lh) / lw; }
+      paint = (x, y) => ctx.drawImage(wm.logo, x, y, mw, mh);
+    } else {
+      const text = String(wm.text || '').trim();
+      if (!text) return;
+      let px = unit;
+      ctx.font = font(px);
+      mw = ctx.measureText(text).width;
+      if (mw > W * 0.9) { px *= (W * 0.9) / mw; ctx.font = font(px); mw = ctx.measureText(text).width; }
+      mh = px;
+      const light = isLight(wm.color);
+      paint = (x, y) => {
+        ctx.font = font(px);
+        ctx.textBaseline = 'top';
+        ctx.fillStyle = wm.color;
+        ctx.shadowColor = light ? 'rgba(0,0,0,.45)' : 'rgba(255,255,255,.45)';
+        ctx.shadowBlur = px * 0.15;
+        ctx.fillText(text, x, y);
+      };
+    }
+
+    ctx.save();
+    ctx.globalAlpha = wm.opacity / 100;
+    if (wm.pos === 'tile') {
+      ctx.translate(W / 2, H / 2);
+      ctx.rotate(-Math.PI / 6);
+      const stepX = mw + unit * 3, stepY = mh + unit * 3;
+      const R = Math.hypot(W, H) / 2 + Math.max(stepX, stepY);
+      let row = 0;
+      for (let y = -R; y < R; y += stepY, row++) {
+        for (let x = -R + (row % 2) * (stepX / 2); x < R; x += stepX) paint(x, y);
+      }
+    } else {
+      const m = Math.round(base * 0.03);
+      const v = wm.pos[0], h = wm.pos[1];
+      const x = h === 'l' ? m : h === 'c' ? (W - mw) / 2 : W - mw - m;
+      const y = v === 't' ? m : v === 'm' ? (H - mh) / 2 : H - mh - m;
+      paint(x, y);
+    }
+    ctx.restore();
+  }
+
   /* Con MozJPEG activado se codifica de las dos formas y se queda el más
    * pequeño: MozJPEG suele ganar, pero en imágenes con mucho detalle fino a
    * veces pesa más. Si no se puede descargar, solo el JPEG del navegador. */
@@ -69,6 +131,10 @@ function PixelotePipeline(Encoders) {
   async function run(job) {
     const canvas = render(job.source, job.g, !job.fmt.alpha, job.bg);
     if (job.source.close) job.source.close(); // ImageBitmap: libera memoria cuanto antes
+    if (job.wm) {
+      applyWatermark(canvas, job.wm);
+      if (job.wm.logo && job.wm.logo.close) job.wm.logo.close();
+    }
     let pixels = null;
     const px = () => pixels || (pixels = canvas.getContext('2d').getImageData(0, 0, canvas.width, canvas.height));
     const once = async (q) => {
@@ -96,7 +162,7 @@ function PixelotePipeline(Encoders) {
     return { blob, page: res.page, q, missed, mozFailed: !!job.mozFailed };
   }
 
-  return { run, render };
+  return { run, render, applyWatermark };
 }
 
 if (typeof window !== 'undefined') window.Pipeline = PixelotePipeline(window.Encoders);

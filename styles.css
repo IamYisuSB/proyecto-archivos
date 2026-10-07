@@ -18,8 +18,9 @@
   --radius: 14px;
   color-scheme: light;
 }
+/* Modo oscuro: el del sistema, salvo que se elija otro con el botón (data-theme) */
 @media (prefers-color-scheme: dark) {
-  :root {
+  :root:not([data-theme="light"]) {
     --bg: #111118;
     --surface: #1a1a24;
     --surface-2: #23232f;
@@ -38,6 +39,25 @@
     --shadow: 0 1px 2px rgba(0, 0, 0, .3), 0 6px 20px rgba(0, 0, 0, .25);
     color-scheme: dark;
   }
+}
+:root[data-theme="dark"] {
+  --bg: #111118;
+  --surface: #1a1a24;
+  --surface-2: #23232f;
+  --border: #2e2e3d;
+  --text: #ececf3;
+  --muted: #9a9ab0;
+  --accent: #8080ff;
+  --accent-strong: #9a9aff;
+  --accent-soft: #26264a;
+  --on-accent: #0f0f1a;
+  --good: #4ade80;
+  --good-soft: #143222;
+  --bad: #fb923c;
+  --bad-soft: #3a2214;
+  --warn: #facc15;
+  --shadow: 0 1px 2px rgba(0, 0, 0, .3), 0 6px 20px rgba(0, 0, 0, .25);
+  color-scheme: dark;
 }
 
 * { box-sizing: border-box; }
@@ -446,3 +466,100 @@ input[type="range"]::-moz-range-thumb {
 .cmp-label.left { left: 10px; }
 .cmp-label.right { right: 10px; }
 .cmp-range { flex: 1; margin: 0 8px 0 0; --fill: 50%; }
+
+/* ---------- Fase 4 ---------- */
+.top-actions { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.icon-toggle, .lang-select {
+  height: 34px; border-radius: 10px; border: 1px solid var(--border);
+  background: var(--surface); color: var(--text); cursor: pointer; font: inherit; font-size: 13px; font-weight: 600;
+}
+.icon-toggle { width: 38px; font-size: 16px; display: grid; place-items: center; }
+.lang-select { padding: 0 6px; }
+.icon-toggle:hover, .lang-select:hover { border-color: var(--accent); }
+
+.banner {
+  display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
+  padding: 12px 16px; border-radius: var(--radius);
+  background: var(--accent-soft); border: 1px solid var(--accent); font-size: 14px;
+}
+.reorder-hint { margin: -6px 0 0; }
+
+.item[draggable="true"] { cursor: grab; }
+.item.dragging-item { opacity: .45; outline: 2px dashed var(--accent); }
+.variants { display: flex; flex-wrap: wrap; gap: 4px; }
+.variants a {
+  font-size: 11.5px; font-weight: 600; text-decoration: none; color: var(--accent);
+  background: var(--accent-soft); padding: 2px 7px; border-radius: 999px;
+}
+.variants a:hover { outline: 1px solid var(--accent); }
+
+.my-presets { display: flex; flex-direction: column; gap: 6px; margin-top: 8px; }
+.my-preset { display: flex; gap: 4px; }
+.my-preset .preset-apply {
+  flex: 1; text-align: left; padding: 7px 10px; border-radius: 9px; cursor: pointer; font-size: 13px; font-weight: 600;
+  background: var(--surface-2); border: 1px solid transparent; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.my-preset .preset-apply:hover { border-color: var(--accent); }
+.my-preset .mini {
+  width: 32px; border-radius: 9px; cursor: pointer; background: var(--surface-2); border: 1px solid transparent; font-size: 13px;
+}
+.my-preset .mini:hover { border-color: var(--accent); }
+.preset-actions { display: flex; gap: 6px; margin-top: 8px; flex-wrap: wrap; }
+.save-preset { display: flex; gap: 6px; margin-top: 8px; }
+.save-preset input, .text-input {
+  flex: 1; min-width: 0; padding: 7px 10px; font: inherit; font-size: 14px; color: var(--text);
+  background: var(--surface-2); border: 1px solid var(--border); border-radius: 8px;
+}
+.save-preset input:focus, .text-input:focus { outline: 2px solid var(--accent); outline-offset: -1px; border-color: transparent; }
+
+.segmented.five { grid-template-columns: repeat(5, 1fr); }
+.segmented.five button { font-size: 12.5px; padding: 7px 2px; }
+.segmented.two.wide { display: grid; grid-template-columns: 1fr 1fr; }
+
+.optional { font-weight: 500; font-size: 12px; }
+.check.first { margin-top: 0; }
+.wm-body { display: flex; flex-direction: column; gap: 10px; margin-top: 12px; }
+.wm-row { display: flex; align-items: center; gap: 8px; }
+.wm-row input[type="color"] { width: 40px; height: 34px; border: 1px solid var(--border); border-radius: 8px; padding: 2px; background: var(--surface); cursor: pointer; }
+#wmLogoPreview { width: 40px; height: 40px; object-fit: contain; border-radius: 6px; background: repeating-conic-gradient(var(--surface-2) 0 25%, var(--surface) 0 50%) 0 0 / 10px 10px; }
+.wm-grid { display: flex; gap: 12px; align-items: flex-start; }
+.pos-grid { display: grid; grid-template-columns: repeat(3, 26px); gap: 4px; margin-top: 4px; }
+.pos-grid button {
+  height: 22px; border-radius: 5px; cursor: pointer; background: var(--surface-2); border: 1.5px solid var(--border);
+}
+.pos-grid button[aria-checked="true"] { background: var(--accent); border-color: var(--accent); }
+.pos-grid .tile { grid-column: 1 / -1; height: 26px; font-size: 11.5px; font-weight: 600; color: var(--muted); }
+.pos-grid .tile[aria-checked="true"] { color: var(--on-accent); }
+.wm-preview {
+  flex: 1; min-width: 0; max-width: 200px; height: auto; border-radius: 8px; border: 1px solid var(--border);
+  background: repeating-conic-gradient(var(--surface-2) 0 25%, var(--surface) 0 50%) 0 0 / 12px 12px;
+}
+
+.folder-save { width: 100%; border-color: transparent; color: var(--accent); }
+.folder-save:hover:not(:disabled) { border-color: var(--border); }
+
+.small-dialog {
+  border: none; padding: 0; border-radius: 16px; width: min(440px, calc(100vw - 32px));
+  background: var(--surface); color: var(--text); box-shadow: 0 20px 60px rgba(0, 0, 0, .35);
+}
+.small-dialog::backdrop { background: rgba(10, 10, 20, .6); }
+.small-inner { display: flex; flex-direction: column; gap: 12px; padding: 20px; }
+.small-inner h2 { font-size: 17px; }
+.small-inner > p { margin: -8px 0 0; font-size: 13px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.small-inner .check { margin-top: 0; }
+.small-inner input[type="range"] { margin: 0; }
+.move-row { display: grid; grid-template-columns: repeat(4, 1fr); gap: 4px; }
+.move-row .btn { padding: 6px 4px; font-size: 12px; }
+.small-foot { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; margin-top: 4px; }
+
+@media (max-width: 600px) {
+  .privacy span { display: none; }
+  .top-actions { gap: 6px; }
+}
+.toolbar-actions { flex-wrap: wrap; }
+.toolbar-actions .btn, .res-actions .btn { white-space: nowrap; }
+.res-actions { flex-wrap: wrap; }
+@media (max-width: 600px) {
+  .toolbar-actions .btn { padding: 6px 10px; font-size: 13px; }
+  .res-actions .btn { flex: 1 1 100%; }
+}

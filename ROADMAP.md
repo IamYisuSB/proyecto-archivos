@@ -66,17 +66,22 @@ Leyenda: ✅ hecho · 🔜 siguiente · 🧭 más adelante · 💡 idea a valora
 - Los metadatos solo se conservan al pasar de JPG a JPG, PNG o WebP. HEIC, RAW y el resto pierden el EXIF al leerse.
 - La clasificación de "Auto" es heurística: transparencia real → "con transparencia"; si 16 colores ocupan más de la mitad de la imagen → "gráfico"; si no → "foto".
 
-## Fase 4: flujo de trabajo 🧭
+## Fase 4: flujo de trabajo ✅
 
 **Objetivo:** que la herramienta encaje en el trabajo diario.
 
-- **App instalable (PWA)** y funcionamiento sin conexión.
-- **Atajos personalizados**: guardar y compartir combinaciones de ajustes.
-- Generar **varios tamaños a la vez** (por ejemplo 400, 800 y 1600 px) para imágenes web adaptables.
-- **Marca de agua opcional** de texto o logo (cada persona decide si la añade; por defecto, ninguna).
-- Reordenar el lote y aplicar ajustes distintos a cada imagen.
-- Abrir y guardar carpetas directamente (File System Access API).
-- Traducción a inglés y portugués.
+- ✅ **App instalable (PWA) y sin conexión.** Hay un service worker con la app en caché y un botón para descargar los códecs (HEIC, TIFF, AVIF, MozJPEG). Instalarla exige servir la app por https (o en localhost).
+- ✅ **Atajos personalizados:** guardar los ajustes actuales con un nombre, compartirlos por enlace (`#atajo=…`) o como archivo `.json`, e importarlos. Los atajos recibidos se validan: solo se aceptan ajustes conocidos y del tipo correcto.
+- ✅ **Varios tamaños a la vez** (modo "Varios" del paso 3): una copia por ancho, terminada en `-400w`, `-800w`…, para `srcset`. Nunca agranda.
+- ✅ **Marca de agua opcional** de texto (color a elegir) o logo, en 9 posiciones o en mosaico, con tamaño, opacidad y vista previa. Por defecto, desactivada.
+- ✅ **Reordenar el lote** arrastrando las tarjetas o con los botones del diálogo ⚙. **Ajustes propios por imagen:** formato, calidad y ancho máximo.
+- ✅ **Carpetas:** soltar carpetas enteras o elegirlas con "Añadir carpeta", manteniendo las subcarpetas en el ZIP. **Guardar en carpeta** directamente (Chrome y Edge), sin sobrescribir archivos.
+- ✅ **Idiomas:** español, inglés y portugués (se detecta el del navegador y se puede cambiar).
+- ✅ **Botón de modo claro / oscuro** (por defecto sigue al sistema; la elección se recuerda).
+
+**Notas técnicas**
+- Al publicar una versión nueva, sube `VERSION` en `sw.js` para que los navegadores renueven la caché.
+- "Guardar en carpeta" usa la File System Access API, que solo existe en Chrome, Edge y Opera; en el resto el botón no aparece.
 
 ## Ideas a valorar 💡
 
