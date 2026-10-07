@@ -1747,6 +1747,70 @@
     return null;
   }
 
+  /* ---------- Navegador y sistema, en palabras ---------- */
+
+  // Datos extra que dan Chrome y Edge (Client Hints): versión exacta y Windows 10 / 11
+  let uaHints = null;
+  function loadUaHints() {
+    const uad = navigator.userAgentData;
+    if (!uad || !uad.getHighEntropyValues) return;
+    uad.getHighEntropyValues(['platformVersion', 'fullVersionList', 'model'])
+      .then((h) => { uaHints = h; })
+      .catch(() => { /* no disponible */ });
+  }
+
+  /* El "user agent" menciona varios navegadores por compatibilidad histórica
+   * (Mozilla, Safari, Chrome…). Aquí se saca el que es de verdad. */
+  function describeBrowser() {
+    const ua = navigator.userAgent;
+    const m = (re) => { const r = ua.match(re); return r ? r[1] : null; };
+    let name = 'Desconocido', version = '', engine = '';
+
+    const brands = (uaHints && uaHints.fullVersionList) || (navigator.userAgentData && navigator.userAgentData.brands) || [];
+    const brand = (n) => brands.find((b) => b.brand === n);
+    const known = ['Microsoft Edge', 'Opera', 'Brave', 'Vivaldi', 'Samsung Internet', 'Google Chrome', 'Chromium'];
+    const fromHints = known.map(brand).find(Boolean);
+
+    if (fromHints) {
+      name = fromHints.brand.replace('Google ', '').replace('Microsoft ', '');
+      version = String(fromHints.version).split('.')[0];
+      engine = 'Chromium';
+    } else if (m(/Edg(?:e|A|iOS)?\/(\d+)/)) { name = 'Edge'; version = m(/Edg(?:e|A|iOS)?\/(\d+)/); engine = 'Chromium'; }
+    else if (m(/OPR\/(\d+)/)) { name = 'Opera'; version = m(/OPR\/(\d+)/); engine = 'Chromium'; }
+    else if (m(/SamsungBrowser\/(\d+)/)) { name = 'Samsung Internet'; version = m(/SamsungBrowser\/(\d+)/); engine = 'Chromium'; }
+    else if (m(/(?:Firefox|FxiOS)\/(\d+)/)) { name = 'Firefox'; version = m(/(?:Firefox|FxiOS)\/(\d+)/); engine = /FxiOS/.test(ua) ? 'WebKit' : 'Gecko'; }
+    else if (m(/CriOS\/(\d+)/)) { name = 'Chrome'; version = m(/CriOS\/(\d+)/); engine = 'WebKit'; }
+    else if (m(/Chrome\/(\d+)/)) { name = /HeadlessChrome/.test(ua) ? 'Chrome (sin interfaz)' : 'Chrome'; version = m(/Chrome\/(\d+)/); engine = 'Chromium'; }
+    else if (/Safari\//.test(ua) && m(/Version\/([\d.]+)/)) { name = 'Safari'; version = m(/Version\/([\d.]+)/); engine = 'WebKit'; }
+    if (navigator.brave && name === 'Chrome') name = 'Brave';
+
+    // Sistema operativo
+    let os = 'Desconocido';
+    const platform = navigator.userAgentData && navigator.userAgentData.platform;
+    if (/Windows/.test(ua) || platform === 'Windows') {
+      const pv = uaHints && parseInt(String(uaHints.platformVersion).split('.')[0], 10);
+      os = pv >= 13 ? 'Windows 11' : pv > 0 ? 'Windows 10' : 'Windows 10/11';
+    } else if (/iPhone|iPad|iPod/.test(ua)) {
+      os = `${/iPad/.test(ua) ? 'iPadOS' : 'iOS'} ${(m(/OS (\d+[_\d]*) like Mac/) || '').replace(/_/g, '.')}`.trim();
+    } else if (/Mac OS X/.test(ua)) {
+      // Safari en iPad se presenta como Mac; se distingue por la pantalla táctil
+      os = navigator.maxTouchPoints > 1 ? 'iPadOS' : 'macOS';
+    } else if (/Android/.test(ua)) {
+      os = `Android ${m(/Android ([\d.]+)/) || ''}`.trim();
+    } else if (/CrOS/.test(ua)) {
+      os = 'ChromeOS';
+    } else if (/Linux/.test(ua)) {
+      os = 'Linux';
+    }
+
+    const mobile = (navigator.userAgentData && navigator.userAgentData.mobile) || /Mobi|iPhone|Android.*Mobile/.test(ua);
+    const tablet = !mobile && (/iPad|Tablet|Android/.test(ua) || os === 'iPadOS');
+    const device = mobile ? 'móvil' : tablet ? 'tableta' : 'ordenador';
+    const model = uaHints && uaHints.model ? ` (${uaHints.model})` : '';
+
+    return `${name}${version ? ' ' + version : ''}${engine ? ` (motor ${engine})` : ''} · ${os} · ${device}${model}`;
+  }
+
   function currentTheme() {
     return document.documentElement.dataset.theme || (matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light');
   }
@@ -1789,7 +1853,8 @@
       delete s.wmText;
       lines.push('', '## Datos técnicos',
         `Versión: ${APP_VERSION}`,
-        `Navegador: ${navigator.userAgent}`,
+        `Navegador: ${describeBrowser()}`,
+        `Agente de usuario (técnico): ${navigator.userAgent}`,
         `Idioma: ${I18N.lang} · Tema: ${currentTheme()} · Diseño: ${document.documentElement.dataset.design || '—'}`,
         `Pantalla: ${screen.width}×${screen.height} @${window.devicePixelRatio}x · Ventana: ${innerWidth}×${innerHeight}`,
         `Abierta desde: ${location.protocol.replace(':', '')} · Instalada: ${matchMedia('(display-mode: standalone)').matches ? 'sí' : 'no'}`,
@@ -2310,6 +2375,7 @@
     $('#appVersion').textContent = APP_VERSION;
     $('#year').textContent = new Date().getFullYear();
     await detectSupport();
+    loadUaHints();
     if (!supported[settings.format]) settings.format = supported.webp ? 'webp' : 'jpeg';
     let savedLogo = null;
     try { savedLogo = localStorage.getItem(LOGO_KEY); } catch (_) { /* sin almacenamiento */ }
