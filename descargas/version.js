@@ -1,7 +1,7 @@
 // Generado por desktop/scripts/publish.mjs. No editar a mano.
 window.PIXELOTE_DOWNLOADS = {
   "version": "4.4.0",
-  "date": "2026-10-07T23:30:02.380Z",
+  "date": "2026-10-07T23:33:11.647Z",
   "repo": "IamYisuSB/proyecto-archivos",
   "tag": "v4.4.0",
   "files": [
