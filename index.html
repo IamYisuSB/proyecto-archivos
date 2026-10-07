@@ -1,0 +1,191 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Pixelote · Conversor de imágenes</title>
+  <meta name="description" content="Convierte, comprime, redimensiona y recorta imágenes por lotes. Todo en tu navegador, sin subir nada.">
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><rect width='32' height='32' rx='8' fill='%235b5bd6'/><path d='M8 22l5-6 4 4 3-3 4 5z' fill='white'/><circle cx='21' cy='11' r='2.5' fill='white'/></svg>">
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <header class="topbar">
+    <div class="brand">
+      <span class="logo" aria-hidden="true">
+        <svg viewBox="0 0 32 32"><rect width="32" height="32" rx="8" fill="currentColor"/><path d="M8 22l5-6 4 4 3-3 4 5z" fill="#fff"/><circle cx="21" cy="11" r="2.5" fill="#fff"/></svg>
+      </span>
+      <div>
+        <h1>Pixelote</h1>
+        <p>Convierte, comprime, redimensiona y recorta imágenes por lotes</p>
+      </div>
+    </div>
+    <div class="privacy" title="El procesamiento ocurre en tu dispositivo">
+      <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2l8 3v6c0 5-3.4 9.3-8 11-4.6-1.7-8-6-8-11V5z" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/><path d="M8.5 12l2.5 2.5 4.5-5" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+      Tus imágenes no salen de tu equipo
+    </div>
+  </header>
+
+  <main class="layout">
+    <!-- Zona de imágenes -->
+    <section class="workspace" aria-label="Imágenes">
+      <label class="dropzone" id="dropzone" tabindex="0">
+        <input type="file" id="fileInput" accept="image/*,.heic,.heif,.tif,.tiff,.bmp,.ico,.svg" multiple hidden>
+        <div class="dz-icon" aria-hidden="true">
+          <svg viewBox="0 0 48 48"><path d="M24 31V11m0 0l-8 8m8-8l8 8" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/><path d="M8 30v6a4 4 0 004 4h24a4 4 0 004-4v-6" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round"/></svg>
+        </div>
+        <div class="dz-text">
+          <strong>Arrastra tus imágenes aquí</strong>
+          <span>o <u>haz clic para elegirlas</u> · también puedes pegar con Ctrl+V</span>
+        </div>
+        <div class="dz-formats">JPG · PNG · WebP · AVIF · GIF · BMP · SVG · ICO</div>
+      </label>
+
+      <div class="toolbar" id="toolbar" hidden>
+        <div class="toolbar-info" id="toolbarInfo"></div>
+        <div class="toolbar-actions">
+          <button class="btn ghost" id="addMoreBtn" type="button">+ Añadir más</button>
+          <button class="btn ghost danger" id="clearBtn" type="button">Vaciar</button>
+        </div>
+      </div>
+
+      <div class="summary" id="summary" hidden></div>
+
+      <ul class="grid" id="grid" aria-live="polite"></ul>
+    </section>
+
+    <!-- Ajustes -->
+    <aside class="panel" aria-label="Ajustes">
+      <div class="panel-scroll">
+        <section class="card-section">
+          <h2>Atajos rápidos</h2>
+          <div class="presets" id="presets"></div>
+        </section>
+
+        <section class="card-section highlight">
+          <h2><span class="step">1</span> Formato de salida</h2>
+          <div class="formats" id="formats" role="radiogroup" aria-label="Formato de salida"></div>
+          <p class="hint" id="formatHint"></p>
+        </section>
+
+        <section class="card-section">
+          <h2><span class="step">2</span> Compresión</h2>
+          <div id="qualityBlock">
+            <div class="row between">
+              <label for="quality">Calidad</label>
+              <output id="qualityOut" class="pill"></output>
+            </div>
+            <input type="range" id="quality" min="1" max="100" step="1">
+            <div class="row between tiny muted"><span>Más ligero</span><span>Mejor calidad</span></div>
+            <label class="check">
+              <input type="checkbox" id="targetOn">
+              <span>Intentar no superar</span>
+              <input type="number" id="targetKB" min="5" step="10" class="num" aria-label="Tamaño máximo en KB"> KB
+            </label>
+          </div>
+          <p class="hint" id="losslessHint" hidden>Este formato no tiene pérdida: la calidad no se ajusta. Reduce el tamaño (paso 3) para que pese menos.</p>
+        </section>
+
+        <section class="card-section">
+          <h2><span class="step">3</span> Tamaño</h2>
+          <div class="segmented" id="resizeMode" role="radiogroup" aria-label="Modo de redimensionado">
+            <button type="button" data-v="none">Original</button>
+            <button type="button" data-v="percent">%</button>
+            <button type="button" data-v="max">Máximo</button>
+            <button type="button" data-v="exact">Exacto</button>
+          </div>
+          <div class="mode-body" data-mode="percent">
+            <div class="row between"><label for="percent">Escala</label><output id="percentOut" class="pill"></output></div>
+            <input type="range" id="percent" min="5" max="200" step="5">
+          </div>
+          <div class="mode-body" data-mode="max">
+            <div class="dims">
+              <label>Ancho máx.<input type="number" id="maxW" min="1" class="num" placeholder="—"></label>
+              <span>×</span>
+              <label>Alto máx.<input type="number" id="maxH" min="1" class="num" placeholder="—"></label>
+              <span class="unit">px</span>
+            </div>
+            <p class="hint">Mantiene la proporción y nunca agranda la imagen.</p>
+          </div>
+          <div class="mode-body" data-mode="exact">
+            <div class="dims">
+              <label>Ancho<input type="number" id="exactW" min="1" class="num"></label>
+              <span>×</span>
+              <label>Alto<input type="number" id="exactH" min="1" class="num"></label>
+              <span class="unit">px</span>
+            </div>
+            <label class="check"><input type="checkbox" id="cover"> <span>Recortar para no deformar</span></label>
+          </div>
+          <p class="hint" data-mode-hint="none">Se mantienen las dimensiones originales.</p>
+        </section>
+
+        <section class="card-section">
+          <h2><span class="step">4</span> Recorte</h2>
+          <div class="chips" id="ratios" role="radiogroup" aria-label="Proporción de recorte"></div>
+          <p class="hint">Recorta todas al centro. Para elegir la zona exacta, pulsa <b>✂</b> en cada imagen.</p>
+        </section>
+
+        <details class="card-section advanced">
+          <summary><h2>Opciones avanzadas</h2></summary>
+          <div class="adv-body">
+            <label class="field">
+              <span>Nombre de los archivos</span>
+              <input type="text" id="pattern" spellcheck="false">
+              <small>Usa <code>{nombre}</code>, <code>{n}</code>, <code>{ancho}</code>, <code>{alto}</code></small>
+            </label>
+            <label class="field inline">
+              <span>Fondo para transparencias<small>(JPG y BMP no admiten transparencia)</small></span>
+              <input type="color" id="bg">
+            </label>
+            <button type="button" class="btn ghost small" id="resetBtn">Restablecer ajustes</button>
+          </div>
+        </details>
+      </div>
+
+      <div class="panel-actions">
+        <div class="progress" id="progress" hidden><div class="progress-bar" id="progressBar"></div></div>
+        <button class="btn primary big" id="processBtn" type="button" disabled>Convertir imágenes</button>
+        <button class="btn secondary big" id="zipBtn" type="button" disabled>
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 4v11m0 0l-4.5-4.5M12 15l4.5-4.5M5 20h14" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+          <span id="zipLabel">Descargar todo</span>
+        </button>
+      </div>
+    </aside>
+  </main>
+
+  <!-- Editor de recorte -->
+  <dialog id="cropDialog" class="crop-dialog">
+    <form method="dialog" class="crop-inner">
+      <header class="crop-head">
+        <div>
+          <h2>Recortar imagen</h2>
+          <p class="muted" id="cropName"></p>
+        </div>
+        <div class="chips small" id="cropRatios"></div>
+      </header>
+      <div class="crop-stage">
+        <div class="crop-wrap" id="cropWrap">
+          <img id="cropImg" alt="" draggable="false">
+          <div class="crop-box" id="cropBox">
+            <span class="crop-size" id="cropSize"></span>
+            <i class="grid-line v1"></i><i class="grid-line v2"></i><i class="grid-line h1"></i><i class="grid-line h2"></i>
+            <span class="h" data-h="nw"></span><span class="h" data-h="n"></span><span class="h" data-h="ne"></span>
+            <span class="h" data-h="e"></span><span class="h" data-h="se"></span><span class="h" data-h="s"></span>
+            <span class="h" data-h="sw"></span><span class="h" data-h="w"></span>
+          </div>
+        </div>
+      </div>
+      <footer class="crop-foot">
+        <button type="button" class="btn ghost danger" id="cropRemove">Quitar recorte</button>
+        <span class="spacer"></span>
+        <button type="submit" class="btn ghost" value="cancel">Cancelar</button>
+        <button type="button" class="btn primary" id="cropApply">Aplicar recorte</button>
+      </footer>
+    </form>
+  </dialog>
+
+  <div class="toast" id="toast" role="status" aria-live="polite"></div>
+
+  <script src="encoders.js"></script>
+  <script src="app.js"></script>
+</body>
+</html>
