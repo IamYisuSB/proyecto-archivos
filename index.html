@@ -29,7 +29,7 @@
     <!-- Zona de imágenes -->
     <section class="workspace" aria-label="Imágenes">
       <label class="dropzone" id="dropzone" tabindex="0">
-        <input type="file" id="fileInput" accept="image/*,.heic,.heif,.tif,.tiff,.bmp,.ico,.svg,.psd,.dng,.cr2,.cr3,.nef,.nrw,.arw,.orf,.rw2,.raf,.pef,.srw" multiple hidden>
+        <input type="file" id="fileInput" accept="image/*,.heic,.heif,.tif,.tiff,.bmp,.ico,.svg,.dng,.cr2,.cr3,.nef,.nrw,.arw,.orf,.rw2,.raf,.pef,.srw" multiple hidden>
         <div class="dz-icon" aria-hidden="true">
           <svg viewBox="0 0 48 48"><path d="M24 31V11m0 0l-8 8m8-8l8 8" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/><path d="M8 30v6a4 4 0 004 4h24a4 4 0 004-4v-6" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round"/></svg>
         </div>
@@ -37,12 +37,13 @@
           <strong>Arrastra tus imágenes aquí</strong>
           <span>o <u>haz clic para elegirlas</u> · también puedes pegar con Ctrl+V</span>
         </div>
-        <div class="dz-formats">JPG · PNG · WebP · AVIF · HEIC · TIFF · GIF · BMP · SVG · ICO · PSD · RAW</div>
+        <div class="dz-formats">JPG · PNG · WebP · AVIF · HEIC · TIFF · GIF · BMP · SVG · ICO · RAW</div>
       </label>
 
       <div class="toolbar" id="toolbar" hidden>
         <div class="toolbar-info" id="toolbarInfo"></div>
         <div class="toolbar-actions">
+          <button class="btn ghost" id="rotateAllBtn" type="button" title="Girar todas 90°">⟳ Girar todas</button>
           <button class="btn ghost" id="addMoreBtn" type="button">+ Añadir más</button>
           <button class="btn ghost danger" id="clearBtn" type="button">Vaciar</button>
         </div>
@@ -75,6 +76,17 @@
               </div>
             </div>
           </div>
+          <div class="fmt-options auto-rules" id="autoOptions" hidden>
+            <label class="rule"><span>📷 Fotos</span>
+              <select id="autoPhoto"><option value="webp">WebP</option><option value="jpeg">JPG</option><option value="avif">AVIF</option></select>
+            </label>
+            <label class="rule"><span>🫥 Con transparencia</span>
+              <select id="autoAlpha"><option value="webp">WebP</option><option value="png">PNG</option><option value="avif">AVIF</option></select>
+            </label>
+            <label class="rule"><span>📐 Gráficos y capturas</span>
+              <select id="autoGraphic"><option value="png">PNG</option><option value="webp">WebP</option></select>
+            </label>
+          </div>
         </section>
 
         <section class="card-section">
@@ -92,6 +104,24 @@
               <input type="number" id="targetKB" min="5" step="10" class="num" aria-label="Tamaño máximo en KB"> KB
             </label>
           </div>
+          <div id="pngOptions" class="sub-block">
+            <div class="row between">
+              <span class="label">Compresión PNG</span>
+              <div class="segmented two" id="pngMode" role="radiogroup" aria-label="Compresión PNG">
+                <button type="button" data-v="lossless">Sin pérdida</button>
+                <button type="button" data-v="palette">Optimizada</button>
+              </div>
+            </div>
+            <div id="pngColorsRow">
+              <div class="row between"><label for="pngColors">Colores</label><output id="pngColorsOut" class="pill"></output></div>
+              <input type="range" id="pngColors" min="2" max="256" step="1">
+              <p class="hint">Reduce la paleta como TinyPNG: suele pesar un 50–70 % menos y apenas se nota.</p>
+            </div>
+          </div>
+          <label class="check sub-block" id="mozBlock">
+            <input type="checkbox" id="mozjpeg">
+            <span>JPG más ligeros con MozJPEG <small class="muted">(nunca más grande que sin él)</small></span>
+          </label>
           <p class="hint" id="losslessHint" hidden>Este formato no tiene pérdida: la calidad no se ajusta. Reduce el tamaño (paso 3) para que pese menos.</p>
         </section>
 
@@ -131,7 +161,7 @@
         <section class="card-section">
           <h2><span class="step">4</span> Recorte</h2>
           <div class="chips" id="ratios" role="radiogroup" aria-label="Proporción de recorte"></div>
-          <p class="hint">Recorta todas al centro. Para elegir la zona exacta, pulsa <b>✂</b> en cada imagen.</p>
+          <p class="hint">Recorta todas al centro. Para elegir la zona exacta, girar o voltear, pulsa <b>✂</b> en cada imagen (o <b>⟳</b> para girarla).</p>
         </section>
 
         <details class="card-section advanced">
@@ -146,6 +176,15 @@
               <span>Fondo para transparencias<small>(JPG y BMP no admiten transparencia)</small></span>
               <input type="color" id="bg">
             </label>
+            <div class="field">
+              <span>Datos de la foto (EXIF)</span>
+              <div class="segmented three" id="meta" role="radiogroup" aria-label="Datos de la foto">
+                <button type="button" data-v="strip">Quitar todos</button>
+                <button type="button" data-v="keep-nogps">Sin ubicación</button>
+                <button type="button" data-v="keep">Conservar</button>
+              </div>
+              <small id="metaHint"></small>
+            </div>
             <button type="button" class="btn ghost small" id="resetBtn">Restablecer ajustes</button>
           </div>
         </details>
@@ -162,19 +201,25 @@
     </aside>
   </main>
 
-  <!-- Editor de recorte -->
+  <!-- Editor: recortar, girar y voltear -->
   <dialog id="cropDialog" class="crop-dialog">
     <form method="dialog" class="crop-inner">
       <header class="crop-head">
         <div>
-          <h2>Recortar imagen</h2>
+          <h2>Recortar y girar</h2>
           <p class="muted" id="cropName"></p>
+        </div>
+        <div class="crop-tools" id="cropTools">
+          <button type="button" class="tool" data-op="ccw" title="Girar a la izquierda" aria-label="Girar a la izquierda">⟲</button>
+          <button type="button" class="tool" data-op="cw" title="Girar a la derecha" aria-label="Girar a la derecha">⟳</button>
+          <button type="button" class="tool" data-op="fh" title="Voltear horizontal" aria-label="Voltear horizontal">⇋</button>
+          <button type="button" class="tool" data-op="fv" title="Voltear vertical" aria-label="Voltear vertical">⇵</button>
         </div>
         <div class="chips small" id="cropRatios"></div>
       </header>
       <div class="crop-stage">
         <div class="crop-wrap" id="cropWrap">
-          <img id="cropImg" alt="" draggable="false">
+          <canvas id="cropCanvas"></canvas>
           <div class="crop-box" id="cropBox">
             <span class="crop-size" id="cropSize"></span>
             <i class="grid-line v1"></i><i class="grid-line v2"></i><i class="grid-line h1"></i><i class="grid-line h2"></i>
@@ -185,10 +230,39 @@
         </div>
       </div>
       <footer class="crop-foot">
-        <button type="button" class="btn ghost danger" id="cropRemove">Quitar recorte</button>
+        <button type="button" class="btn ghost danger" id="cropReset">Restablecer</button>
         <span class="spacer"></span>
         <button type="submit" class="btn ghost" value="cancel">Cancelar</button>
-        <button type="button" class="btn primary" id="cropApply">Aplicar recorte</button>
+        <button type="button" class="btn primary" id="cropApply">Aplicar</button>
+      </footer>
+    </form>
+  </dialog>
+
+  <!-- Comparador antes / después -->
+  <dialog id="cmpDialog" class="crop-dialog cmp-dialog">
+    <form method="dialog" class="crop-inner">
+      <header class="crop-head">
+        <div>
+          <h2>Antes y después</h2>
+          <p class="muted"><span id="cmpTitle"></span> · <span id="cmpInfo"></span></p>
+        </div>
+        <div class="segmented two" id="cmpZoom" role="radiogroup" aria-label="Zoom">
+          <button type="button" data-v="fit">Ajustar</button>
+          <button type="button" data-v="100">100 %</button>
+        </div>
+      </header>
+      <div class="cmp-stage" id="cmpStage">
+        <div class="cmp-wrap fit" id="cmpWrap">
+          <canvas id="cmpBefore"></canvas>
+          <img id="cmpAfter" alt="Resultado" draggable="false">
+          <div class="cmp-line" id="cmpLine"><span class="cmp-handle" aria-hidden="true">⇆</span></div>
+          <span class="cmp-label left" id="cmpLabelBefore"></span>
+          <span class="cmp-label right" id="cmpLabelAfter"></span>
+        </div>
+      </div>
+      <footer class="crop-foot">
+        <input type="range" id="cmpRange" min="0" max="100" value="50" aria-label="Posición del comparador" class="cmp-range">
+        <button type="submit" class="btn primary" value="close">Cerrar</button>
       </footer>
     </form>
   </dialog>
@@ -196,6 +270,7 @@
   <div class="toast" id="toast" role="status" aria-live="polite"></div>
 
   <script src="encoders.js"></script>
+  <script src="pipeline.js"></script>
   <script src="decoders.js"></script>
   <script src="app.js"></script>
 </body>

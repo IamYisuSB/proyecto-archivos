@@ -1,5 +1,5 @@
 /* Lectura de formatos que el navegador no abre por sí mismo: HEIC/HEIF,
- * TIFF, PSD y RAW de cámara. Cada decodificador devuelve un Blob PNG/JPEG
+ * TIFF y RAW de cámara. Cada decodificador devuelve un Blob PNG/JPEG
  * que ya se puede cargar en un <img>. Las librerías externas se descargan
  * solo la primera vez que se necesitan. */
 (function (global) {
@@ -11,7 +11,7 @@
     utif: 'https://cdn.jsdelivr.net/npm/utif@3.1.0/UTIF.js',
   };
 
-  const LABELS = { heic: 'HEIC', tiff: 'TIFF', psd: 'PSD', raw: 'RAW' };
+  const LABELS = { heic: 'HEIC', tiff: 'TIFF', raw: 'RAW' };
 
   const RAW_EXT = /\.(cr2|cr3|crw|nef|nrw|arw|srf|sr2|dng|orf|rw2|raf|pef|srw|x3f|3fr|erf|kdc|mrw|mos|rwl|iiq|raw)$/i;
 
@@ -19,7 +19,6 @@
     const n = file.name, t = file.type;
     if (/\.(heic|heif)$/i.test(n) || /image\/hei[cf]/.test(t)) return 'heic';
     if (/\.tiff?$/i.test(n) || t === 'image/tiff') return 'tiff';
-    if (/\.psd$/i.test(n) || t === 'image/vnd.adobe.photoshop') return 'psd';
     if (RAW_EXT.test(n)) return 'raw';
     return null;
   }
@@ -67,85 +66,6 @@
     UTIF.decodeImage(buf, page, ifds);
     const rgba = UTIF.toRGBA8(page);
     return rgbaToPNG(rgba, page.width, page.height);
-  }
-
-  /* ---------- PSD / PSB (imagen combinada, 8 bits, RGB o gris) ---------- */
-
-  function unpackBits(src, p, end, dst, d) {
-    while (p < end) {
-      const n = src[p] > 127 ? src[p] - 256 : src[p];
-      p++;
-      if (n >= 0) {
-        for (let i = 0; i <= n; i++) dst[d++] = src[p++];
-      } else if (n > -128) {
-        const v = src[p++];
-        for (let i = 0; i < 1 - n; i++) dst[d++] = v;
-      }
-    }
-    return d;
-  }
-
-  async function decodePSD(file) {
-    const buf = await file.arrayBuffer();
-    const v = new DataView(buf);
-    const u8 = new Uint8Array(buf);
-    if (v.getUint32(0) !== 0x38425053) throw new Error('No es un PSD'); // "8BPS"
-    const psb = v.getUint16(4) === 2;
-    const channels = v.getUint16(12);
-    const h = v.getUint32(14);
-    const w = v.getUint32(18);
-    const depth = v.getUint16(22);
-    const mode = v.getUint16(24);
-    if (depth !== 8 || (mode !== 3 && mode !== 1)) {
-      throw new Error('Solo PSD de 8 bits en RGB o escala de grises');
-    }
-
-    let p = 26;
-    p += 4 + v.getUint32(p); // datos de modo de color
-    p += 4 + v.getUint32(p); // recursos de imagen
-    p += psb ? 8 + Number(v.getBigUint64(p)) : 4 + v.getUint32(p); // capas y máscaras
-    const compression = v.getUint16(p);
-    p += 2;
-
-    const n = w * h;
-    const used = Math.min(channels, mode === 3 ? 4 : 2);
-    const planes = [];
-    if (compression === 0) {
-      for (let c = 0; c < used; c++) planes.push(u8.subarray(p + c * n, p + (c + 1) * n));
-    } else if (compression === 1) {
-      const cs = psb ? 4 : 2;
-      const rows = channels * h;
-      let data = p + rows * cs;
-      for (let c = 0; c < used; c++) {
-        const plane = new Uint8Array(n);
-        let d = 0;
-        for (let y = 0; y < h; y++) {
-          const r = c * h + y;
-          const len = psb ? v.getUint32(p + r * cs) : v.getUint16(p + r * cs);
-          d = unpackBits(u8, data, data + len, plane, d);
-          data += len;
-        }
-        planes.push(plane);
-      }
-    } else {
-      throw new Error('Compresión PSD no compatible');
-    }
-
-    const rgba = new Uint8ClampedArray(n * 4);
-    const [r, g, b] = mode === 3 ? planes : [planes[0], planes[0], planes[0]];
-    const a = mode === 3 ? planes[3] : planes[1];
-    for (let i = 0, o = 0; i < n; i++, o += 4) {
-      let rr = r[i], gg = g[i], bb = b[i], aa = a ? a[i] : 255;
-      if (a && aa < 255) {
-        // Photoshop guarda la imagen combinada mezclada con blanco: se deshace
-        if (aa === 0) { rr = gg = bb = 0; } else {
-          const k = 255 / aa;
-          rr = (rr - 255 + aa) * k; gg = (gg - 255 + aa) * k; bb = (bb - 255 + aa) * k;
-        }
-      }
-      rgba[o] = rr; rgba[o + 1] = gg; rgba[o + 2] = bb; rgba[o + 3] = aa;
-    }
-    return rgbaToPNG(rgba, w, h);
   }
 
   /* ---------- RAW de cámara: vista previa JPEG incrustada ---------- */
@@ -214,7 +134,7 @@
     return best.blob;
   }
 
-  const DECODERS = { heic: decodeHEIC, tiff: decodeTIFF, psd: decodePSD, raw: decodeRAW };
+  const DECODERS = { heic: decodeHEIC, tiff: decodeTIFF, raw: decodeRAW };
 
   function decode(file, kind) {
     return DECODERS[kind](file);

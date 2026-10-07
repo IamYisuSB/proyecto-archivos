@@ -1,7 +1,36 @@
-/* Codificadores que el navegador no trae de serie (BMP, TIFF, ICO) y un
- * generador de ZIP sin compresión. Sin dependencias externas. */
-(function (global) {
+/* Codificadores que el navegador no trae de serie (BMP, TIFF, ICO, GIF, PDF,
+ * PNG optimizado), generador de ZIP, metadatos EXIF y códecs WebAssembly
+ * (AVIF y MozJPEG).
+ *
+ * Todo vive dentro de PixeloteEncoders() para poder ejecutarlo tal cual en un
+ * Web Worker: el Worker recibe el código fuente de esta función. Por eso no
+ * puede depender de nada de fuera de ella. */
+function PixeloteEncoders(global) {
   'use strict';
+
+  const inWorker = typeof document === 'undefined';
+
+  /* ---------- Lienzos que funcionan dentro y fuera de un Worker ---------- */
+
+  const offscreen = (() => {
+    try { return typeof OffscreenCanvas !== 'undefined' && !!new OffscreenCanvas(1, 1).getContext('2d'); } catch (_) { return false; }
+  })();
+
+  function makeCanvas(w, h) {
+    if (offscreen) return new OffscreenCanvas(w, h);
+    const c = document.createElement('canvas');
+    c.width = w; c.height = h;
+    return c;
+  }
+
+  /* Codifica un lienzo; falla si el navegador devuelve otro formato (lo hace en silencio). */
+  async function canvasToBlob(canvas, type, quality) {
+    const blob = canvas.convertToBlob
+      ? await canvas.convertToBlob({ type, quality })
+      : await new Promise((res) => canvas.toBlob(res, type, quality));
+    if (!blob || blob.type !== type) throw new Error('Formato no disponible aquí: ' + type);
+    return blob;
+  }
 
   /* BMP de 24 bits, sin compresión. La imagen debe llegar ya opaca. */
   function encodeBMP(imageData) {
@@ -96,8 +125,7 @@
     const sizes = [16, 24, 32, 48, 64, 128, 256].filter((s) => s <= Math.max(side, 16));
     const pngs = [];
     for (const s of sizes) {
-      const c = document.createElement('canvas');
-      c.width = c.height = s;
+      const c = makeCanvas(s, s);
       const g = c.getContext('2d');
       g.imageSmoothingEnabled = true;
       g.imageSmoothingQuality = 'high';
@@ -105,7 +133,7 @@
       const dw = Math.round(canvas.width * scale);
       const dh = Math.round(canvas.height * scale);
       g.drawImage(canvas, Math.round((s - dw) / 2), Math.round((s - dh) / 2), dw, dh);
-      const blob = await new Promise((r) => c.toBlob(r, 'image/png'));
+      const blob = await canvasToBlob(c, 'image/png');
       pngs.push({ s, bytes: new Uint8Array(await blob.arrayBuffer()) });
     }
 
@@ -205,34 +233,27 @@
 
   /* ---------- GIF (estático, 256 colores) ---------- */
 
-  /* Paleta por corte de mediana sobre una muestra de píxeles opacos. */
-  function medianCut(data, maxColors) {
-    const total = data.length / 4;
-    const step = Math.max(1, Math.floor(total / 120000));
-    const samples = [];
-    for (let i = 0; i < total; i += step) {
-      const o = i * 4;
-      if (data[o + 3] >= 128) samples.push(data[o], data[o + 1], data[o + 2]);
-    }
-    const count = samples.length / 3;
-    if (!count) return [[0, 0, 0]];
+  /* Corte de mediana genérico: `samples` son tuplas de `ch` canales seguidas. */
+  function medianCutN(samples, ch, maxColors) {
+    const count = samples.length / ch;
     const s = Uint8Array.from(samples);
     const idx = new Uint32Array(count);
     for (let i = 0; i < count; i++) idx[i] = i;
 
     function stats(box) {
-      let lo = [255, 255, 255], hi = [0, 0, 0];
+      const lo = new Array(ch).fill(255), hi = new Array(ch).fill(0);
       for (let i = box.start; i < box.end; i++) {
-        const o = idx[i] * 3;
-        for (let c = 0; c < 3; c++) {
+        const o = idx[i] * ch;
+        for (let c = 0; c < ch; c++) {
           const x = s[o + c];
           if (x < lo[c]) lo[c] = x;
           if (x > hi[c]) hi[c] = x;
         }
       }
-      const ranges = [hi[0] - lo[0], hi[1] - lo[1], hi[2] - lo[2]];
-      box.channel = ranges.indexOf(Math.max(...ranges));
-      box.range = ranges[box.channel];
+      let best = 0;
+      for (let c = 1; c < ch; c++) if (hi[c] - lo[c] > hi[best] - lo[best]) best = c;
+      box.channel = best;
+      box.range = hi[best] - lo[best];
       return box;
     }
 
@@ -245,21 +266,33 @@
       });
       if (pick < 0) break;
       const b = boxes[pick];
-      const ch = b.channel;
-      idx.subarray(b.start, b.end).sort((x, y) => s[x * 3 + ch] - s[y * 3 + ch]);
+      const c = b.channel;
+      idx.subarray(b.start, b.end).sort((x, y) => s[x * ch + c] - s[y * ch + c]);
       const mid = (b.start + b.end) >> 1;
       boxes.splice(pick, 1, stats({ start: b.start, end: mid }), stats({ start: mid, end: b.end }));
     }
 
     return boxes.map((b) => {
-      let r = 0, g = 0, bl = 0;
+      const sum = new Array(ch).fill(0);
       for (let i = b.start; i < b.end; i++) {
-        const o = idx[i] * 3;
-        r += s[o]; g += s[o + 1]; bl += s[o + 2];
+        const o = idx[i] * ch;
+        for (let c = 0; c < ch; c++) sum[c] += s[o + c];
       }
-      const n = b.end - b.start;
-      return [Math.round(r / n), Math.round(g / n), Math.round(bl / n)];
+      return sum.map((v) => Math.round(v / (b.end - b.start)));
     });
+  }
+
+  /* Paleta RGB para GIF a partir de una muestra de píxeles opacos. */
+  function medianCut(data, maxColors) {
+    const total = data.length / 4;
+    const step = Math.max(1, Math.floor(total / 120000));
+    const samples = [];
+    for (let i = 0; i < total; i += step) {
+      const o = i * 4;
+      if (data[o + 3] >= 128) samples.push(data[o], data[o + 1], data[o + 2]);
+    }
+    if (!samples.length) return [[0, 0, 0]];
+    return medianCutN(samples, 3, maxColors);
   }
 
   function lzwEncode(indices, minCodeSize) {
@@ -421,84 +454,395 @@
     return new Blob(parts, { type: 'application/pdf' });
   }
 
-  /* ---------- AVIF con WebAssembly (para navegadores que no lo generan) ---------- */
+  /* ---------- Códecs WebAssembly: AVIF y MozJPEG ---------- */
 
-  const AVIF_URL = 'https://cdn.jsdelivr.net/npm/@jsquash/avif@2.1.1/codec/enc/avif_enc.js';
+  const WASM = {
+    avif: {
+      url: 'https://cdn.jsdelivr.net/npm/@jsquash/avif@2.1.1/codec/enc/avif_enc.js',
+      mime: 'image/avif',
+      // speed 8: ~8 veces más rápido que el valor por defecto (6) con poca pérdida de compresión
+      options: (q) => ({
+        quality: Math.round(q * 100), qualityAlpha: -1, denoiseLevel: 0,
+        tileColsLog2: 0, tileRowsLog2: 0, speed: 8, subsample: 1, chromaDeltaQ: false,
+        sharpness: 0, tune: 0, enableSharpYUV: false, bitDepth: 8, lossless: false,
+      }),
+    },
+    mozjpeg: {
+      url: 'https://cdn.jsdelivr.net/npm/@jsquash/jpeg@1.6.0/codec/enc/mozjpeg_enc.js',
+      mime: 'image/jpeg',
+      clamped: true, // este códec espera Uint8ClampedArray
+      options: (q) => ({
+        quality: Math.round(q * 100), baseline: false, arithmetic: false, progressive: true,
+        optimize_coding: true, smoothing: 0, color_space: 3, quant_table: 3,
+        trellis_multipass: false, trellis_opt_zero: false, trellis_opt_table: false, trellis_loops: 1,
+        auto_subsample: true, chroma_subsample: 2, separate_chroma_quality: false, chroma_quality: 75,
+      }),
+    },
+  };
 
-  // speed 8: ~8 veces más rápido que el valor por defecto (6) con poca pérdida de compresión
-  const avifOptions = (quality) => ({
-    quality: Math.round(quality * 100), qualityAlpha: -1, denoiseLevel: 0,
-    tileColsLog2: 0, tileRowsLog2: 0, speed: 8, subsample: 1, chromaDeltaQ: false,
-    sharpness: 0, tune: 0, enableSharpYUV: false, bitDepth: 8, lossless: false,
-  });
+  /* Carga y uso directo del códec en el hilo actual. */
+  const direct = {};
+  async function wasmDirect(codec, imageData, options) {
+    if (!direct[codec]) {
+      direct[codec] = import(WASM[codec].url).then((m) => m.default({ noInitialRun: true }));
+      direct[codec].catch(() => { delete direct[codec]; });
+    }
+    const mod = await direct[codec];
+    const d = imageData.data;
+    const input = WASM[codec].clamped ? d : new Uint8Array(d.buffer, d.byteOffset, d.byteLength);
+    const out = mod.encode(input, imageData.width, imageData.height, options);
+    if (!out) throw new Error('Error al codificar');
+    return out.slice();
+  }
 
-  /* Se codifica en un Worker para no congelar la página; si el navegador no
-   * permite crearlo, se hace en el hilo principal. Es un Worker clásico con
-   * import() dinámico porque los Worker de módulo no arrancan desde file://. */
-  const WORKER_SRC = `
-    let mod;
+  /* Fuera de un Worker, el códec se ejecuta en uno propio para no congelar la
+   * página. Es un Worker clásico con import() dinámico porque los Worker de
+   * módulo no arrancan desde file://. */
+  const CODEC_WORKER_SRC = `
+    const URLS = ${JSON.stringify({ avif: WASM.avif.url, mozjpeg: WASM.mozjpeg.url })};
+    const mods = {};
     self.onmessage = async (e) => {
+      const { codec, data, width, height, options } = e.data;
       try {
-        mod = mod || await import('${AVIF_URL}').then((m) => m.default({ noInitialRun: true }));
-        const { data, width, height, options } = e.data;
-        const out = mod.encode(new Uint8Array(data), width, height, options);
-        if (!out) throw new Error('Error al codificar AVIF');
+        if (!mods[codec]) mods[codec] = import(URLS[codec]).then((m) => m.default({ noInitialRun: true }));
+        let mod;
+        try { mod = await mods[codec]; } catch (err) { delete mods[codec]; throw err; }
+        const input = codec === 'mozjpeg' ? new Uint8ClampedArray(data) : new Uint8Array(data);
+        const out = mod.encode(input, width, height, options);
+        if (!out) throw new Error('Error al codificar');
         const copy = out.slice();
         self.postMessage({ ok: true, buf: copy.buffer }, [copy.buffer]);
       } catch (err) {
-        self.postMessage({ ok: false, msg: String(err && err.message || err) });
+        self.postMessage({ ok: false, msg: String((err && err.message) || err) });
       }
     };`;
 
-  let avifWorker = null;
-  let avifMain = null;
-  let avifQueue = Promise.resolve();
+  let codecWorker = null; // false = este navegador no deja crearlo
+  let codecQueue = Promise.resolve();
 
-  function avifInWorker(imageData, options) {
-    if (!avifWorker) {
-      const url = URL.createObjectURL(new Blob([WORKER_SRC], { type: 'text/javascript' }));
-      avifWorker = new Worker(url);
+  function wasmViaWorker(codec, imageData, options) {
+    if (!codecWorker) {
+      codecWorker = new Worker(URL.createObjectURL(new Blob([CODEC_WORKER_SRC], { type: 'text/javascript' })));
     }
     return new Promise((res, rej) => {
-      const w = avifWorker;
-      w.onmessage = (e) => (e.data.ok ? res(e.data.buf) : rej(new Error(e.data.msg)));
+      const w = codecWorker;
+      w.onmessage = (e) => (e.data.ok ? res(new Uint8Array(e.data.buf)) : rej(new Error(e.data.msg)));
       w.onerror = (e) => { e.preventDefault(); rej(new Error('worker')); };
       const copy = imageData.data.slice();
-      w.postMessage({ data: copy.buffer, width: imageData.width, height: imageData.height, options }, [copy.buffer]);
+      w.postMessage({ codec, data: copy.buffer, width: imageData.width, height: imageData.height, options }, [copy.buffer]);
     });
   }
 
-  async function avifInMain(imageData, options) {
-    if (!avifMain) {
-      avifMain = import(AVIF_URL)
-        .then((m) => m.default({ noInitialRun: true }))
-        .catch((e) => { avifMain = null; throw e; });
-    }
-    const mod = await avifMain;
-    const out = mod.encode(new Uint8Array(imageData.data.buffer), imageData.width, imageData.height, options);
-    if (!out) throw new Error('Error al codificar AVIF');
-    return out;
-  }
-
-  function encodeAVIF(imageData, quality) {
-    const options = avifOptions(quality);
-    const job = avifQueue.then(async () => {
+  function wasmEncode(codec, imageData, quality) {
+    const options = WASM[codec].options(quality);
+    const type = WASM[codec].mime;
+    if (inWorker) return wasmDirect(codec, imageData, options).then((out) => new Blob([out], { type }));
+    const job = codecQueue.then(async () => {
       let out;
-      if (avifWorker !== false) {
+      if (codecWorker !== false) {
         try {
-          out = await avifInWorker(imageData, options);
+          out = await wasmViaWorker(codec, imageData, options);
         } catch (e) {
           if (e.message !== 'worker') throw e;
-          if (avifWorker) avifWorker.terminate();
-          avifWorker = false; // el Worker no arranca aquí: se usa el hilo principal
+          if (codecWorker) codecWorker.terminate();
+          codecWorker = false; // el Worker no arranca aquí: se usa el hilo principal
         }
       }
-      if (!out) out = await avifInMain(imageData, options);
-      return new Blob([out], { type: 'image/avif' });
+      if (!out) out = await wasmDirect(codec, imageData, options);
+      return new Blob([out], { type });
     });
-    avifQueue = job.catch(() => {});
+    codecQueue = job.catch(() => {});
     return job;
   }
 
-  global.Encoders = { encodeBMP, encodeTIFF, encodeICO, encodeGIF, encodeAVIF, makePDF, makeZip };
-})(window);
+  /* ---------- PNG optimizado: paleta de hasta 256 colores (como TinyPNG) ---------- */
+
+  const PNG_SIG = Uint8Array.of(137, 80, 78, 71, 13, 10, 26, 10);
+
+  function pngChunk(type, data) {
+    const out = new Uint8Array(12 + data.length);
+    const v = new DataView(out.buffer);
+    v.setUint32(0, data.length);
+    for (let i = 0; i < 4; i++) out[4 + i] = type.charCodeAt(i);
+    out.set(data, 8);
+    v.setUint32(8 + data.length, crc32(out.subarray(4, 8 + data.length)));
+    return out;
+  }
+
+  async function zlib(bytes) {
+    const stream = new Blob([bytes]).stream().pipeThrough(new CompressionStream('deflate'));
+    return new Uint8Array(await new Response(stream).arrayBuffer());
+  }
+
+  /* Paleta RGBA: corte de mediana sobre los píxeles visibles, más una entrada
+   * totalmente transparente si hace falta. Ordenada por alfa para que tRNS sea corto. */
+  function quantizeRGBA(data, maxColors) {
+    let transparent = false;
+    for (let i = 3; i < data.length; i += 4) if (data[i] === 0) { transparent = true; break; }
+    const total = data.length / 4;
+    const step = Math.max(1, Math.floor(total / 150000));
+    const samples = [];
+    for (let i = 0; i < total; i += step) {
+      const o = i * 4;
+      if (data[o + 3] > 0) samples.push(data[o], data[o + 1], data[o + 2], data[o + 3]);
+    }
+    const palette = samples.length ? medianCutN(samples, 4, Math.max(1, transparent ? maxColors - 1 : maxColors)) : [];
+    if (transparent || !palette.length) palette.push([0, 0, 0, 0]);
+    return palette.sort((a, b) => a[3] - b[3]);
+  }
+
+  /* Asigna cada píxel a la paleta con tramado Floyd–Steinberg suave. */
+  function mapPalette(imageData, palette) {
+    const { width: w, height: h, data } = imageData;
+    const n = palette.length;
+    const P = new Int32Array(n * 4);
+    palette.forEach((c, i) => P.set(c, i * 4));
+    const transparentIdx = palette.findIndex((c) => c[3] === 0);
+    const out = new Uint8Array(w * h);
+    const cache = new Int16Array(1 << 19).fill(-1);
+    const STRENGTH = 0.85;
+    let cur = new Float32Array((w + 2) * 4);
+    let next = new Float32Array((w + 2) * 4);
+    const clamp = (x) => (x < 0 ? 0 : x > 255 ? 255 : x | 0);
+
+    for (let y = 0; y < h; y++) {
+      for (let x = 0; x < w; x++) {
+        const o = (y * w + x) * 4;
+        const e = (x + 1) * 4;
+        if (data[o + 3] === 0 && transparentIdx >= 0) { out[y * w + x] = transparentIdx; continue; }
+        const r = clamp(data[o] + cur[e]);
+        const g = clamp(data[o + 1] + cur[e + 1]);
+        const b = clamp(data[o + 2] + cur[e + 2]);
+        const a = clamp(data[o + 3] + cur[e + 3]);
+        const key = ((r >> 3) << 14) | ((g >> 3) << 9) | ((b >> 3) << 4) | (a >> 4);
+        let best = cache[key];
+        if (best < 0) {
+          let bestD = Infinity;
+          for (let p = 0; p < n; p++) {
+            const q = p * 4;
+            const dr = P[q] - r, dg = P[q + 1] - g, db = P[q + 2] - b, da = P[q + 3] - a;
+            const d = 2 * dr * dr + 4 * dg * dg + 3 * db * db + 4 * da * da;
+            if (d < bestD) { bestD = d; best = p; }
+          }
+          cache[key] = best;
+        }
+        out[y * w + x] = best;
+        const q = best * 4;
+        for (let c = 0; c < 4; c++) {
+          const err = ((c === 0 ? r : c === 1 ? g : c === 2 ? b : a) - P[q + c]) * STRENGTH;
+          if (!err) continue;
+          cur[e + 4 + c] += err * 7 / 16;
+          next[e - 4 + c] += err * 3 / 16;
+          next[e + c] += err * 5 / 16;
+          next[e + 4 + c] += err / 16;
+        }
+      }
+      const t = cur; cur = next; next = t;
+      next.fill(0);
+    }
+    return out;
+  }
+
+  async function encodePNG8(imageData, maxColors) {
+    const { width: w, height: h } = imageData;
+    const palette = quantizeRGBA(imageData.data, Math.max(2, Math.min(256, maxColors)));
+    const idx = mapPalette(imageData, palette);
+    const n = palette.length;
+    const depth = n <= 2 ? 1 : n <= 4 ? 2 : n <= 16 ? 4 : 8;
+    const rowBytes = Math.ceil((w * depth) / 8);
+    const raw = new Uint8Array(h * (rowBytes + 1)); // filtro 0 en cada fila (lo recomendado con paleta)
+    for (let y = 0; y < h; y++) {
+      const o = y * (rowBytes + 1) + 1;
+      if (depth === 8) {
+        raw.set(idx.subarray(y * w, (y + 1) * w), o);
+      } else {
+        const per = 8 / depth;
+        for (let x = 0; x < w; x++) raw[o + ((x / per) | 0)] |= idx[y * w + x] << (8 - depth * ((x % per) + 1));
+      }
+    }
+
+    const ihdr = new Uint8Array(13);
+    const v = new DataView(ihdr.buffer);
+    v.setUint32(0, w); v.setUint32(4, h);
+    ihdr[8] = depth; ihdr[9] = 3; // color indexado
+    const plte = new Uint8Array(n * 3);
+    palette.forEach((c, i) => plte.set(c.slice(0, 3), i * 3));
+    const translucent = palette.filter((c) => c[3] < 255).length;
+
+    const parts = [PNG_SIG, pngChunk('IHDR', ihdr), pngChunk('PLTE', plte)];
+    if (translucent) parts.push(pngChunk('tRNS', Uint8Array.from(palette.slice(0, translucent).map((c) => c[3]))));
+    parts.push(pngChunk('IDAT', await zlib(raw)), pngChunk('IEND', new Uint8Array(0)));
+    return new Blob(parts, { type: 'image/png' });
+  }
+
+  /* ---------- Metadatos EXIF ---------- */
+
+  /* Bloque TIFF del EXIF de un JPEG (lo que va tras "Exif\0\0"), o null. */
+  function readJpegExif(buf) {
+    const u8 = new Uint8Array(buf);
+    if (u8[0] !== 0xff || u8[1] !== 0xd8) return null;
+    let p = 2;
+    while (p + 4 <= u8.length) {
+      if (u8[p] !== 0xff) return null;
+      const marker = u8[p + 1];
+      if (marker === 0xff) { p++; continue; }
+      if (marker === 0xda || marker === 0xd9) return null; // empiezan los datos de imagen
+      const len = (u8[p + 2] << 8) | u8[p + 3];
+      if (p + 2 + len > u8.length) return null;
+      if (marker === 0xe1 && len > 8 && u8[p + 4] === 0x45 && u8[p + 5] === 0x78 && u8[p + 6] === 0x69 &&
+          u8[p + 7] === 0x66 && u8[p + 8] === 0 && u8[p + 9] === 0) {
+        return u8.slice(p + 10, p + 2 + len);
+      }
+      p += 2 + len;
+    }
+    return null;
+  }
+
+  const TYPE_SIZE = [0, 1, 1, 2, 4, 8, 1, 1, 2, 4, 8, 4, 8];
+
+  function tiffInfo(t) {
+    if (!t || t.length < 8) return null;
+    const v = new DataView(t.buffer, t.byteOffset, t.byteLength);
+    const bo = v.getUint16(0);
+    if (bo !== 0x4949 && bo !== 0x4d4d) return null;
+    const le = bo === 0x4949;
+    return { v, le, ifd0: v.getUint32(4, le), len: t.length };
+  }
+
+  function findTag(info, ifd, tag) {
+    const { v, le, len } = info;
+    if (ifd + 2 > len) return -1;
+    const n = v.getUint16(ifd, le);
+    for (let i = 0; i < n; i++) {
+      const e = ifd + 2 + i * 12;
+      if (e + 12 > len) break;
+      if (v.getUint16(e, le) === tag) return e;
+    }
+    return -1;
+  }
+
+  function gpsIfd(info) {
+    const e = findTag(info, info.ifd0, 0x8825);
+    if (e < 0) return -1;
+    const off = info.v.getUint32(e + 8, info.le);
+    return off + 2 <= info.len ? off : -1;
+  }
+
+  function exifHasGps(tiff) {
+    const info = tiffInfo(tiff);
+    if (!info) return false;
+    const g = gpsIfd(info);
+    return g >= 0 && info.v.getUint16(g, info.le) > 0;
+  }
+
+  /* Copia del EXIF lista para la imagen nueva: orientación a 1 (los píxeles ya
+   * van girados) y, si se pide, sin ubicación GPS (se borran también los bytes). */
+  function cleanExif(tiff, keepGps) {
+    const t = tiff.slice();
+    const info = tiffInfo(t);
+    if (!info) return null;
+    const { v, le } = info;
+    const o = findTag(info, info.ifd0, 274);
+    if (o >= 0) v.setUint16(o + 8, 1, le);
+    if (!keepGps) {
+      const g = gpsIfd(info);
+      if (g >= 0) {
+        const n = v.getUint16(g, le);
+        for (let i = 0; i < n; i++) {
+          const e = g + 2 + i * 12;
+          if (e + 12 > t.length) break;
+          const size = (TYPE_SIZE[v.getUint16(e + 2, le)] || 1) * v.getUint32(e + 4, le);
+          if (size > 4) {
+            const off = v.getUint32(e + 8, le);
+            if (off + size <= t.length) t.fill(0, off, off + size);
+          }
+        }
+        t.fill(0, g + 2, Math.min(t.length, g + 2 + n * 12 + 4));
+        v.setUint16(g, 0, le);
+      }
+    }
+    return t;
+  }
+
+  function riffChunk(type, data) {
+    const out = new Uint8Array(8 + data.length + (data.length & 1));
+    for (let i = 0; i < 4; i++) out[i] = type.charCodeAt(i);
+    new DataView(out.buffer).setUint32(4, data.length, true);
+    out.set(data, 8);
+    return out;
+  }
+
+  function webpWithExif(u8, tiff) {
+    const v = new DataView(u8.buffer, u8.byteOffset, u8.byteLength);
+    const fourcc = (p) => String.fromCharCode(u8[p], u8[p + 1], u8[p + 2], u8[p + 3]);
+    if (fourcc(0) !== 'RIFF' || fourcc(8) !== 'WEBP') return null;
+    const first = fourcc(12);
+    const exif = riffChunk('EXIF', tiff);
+    let body;
+    if (first === 'VP8X') {
+      const copy = u8.slice(12);
+      copy[8] |= 0x08; // indicador EXIF
+      body = [copy, exif];
+    } else {
+      let flags = 0x08, w, h;
+      if (first === 'VP8L') {
+        const bits = v.getUint32(21, true); // tras la firma 0x2f
+        w = (bits & 0x3fff) + 1;
+        h = ((bits >>> 14) & 0x3fff) + 1;
+        if ((bits >>> 28) & 1) flags |= 0x10; // con alfa
+      } else if (first === 'VP8 ') {
+        w = v.getUint16(26, true) & 0x3fff;
+        h = v.getUint16(28, true) & 0x3fff;
+      } else {
+        return null;
+      }
+      const vp8x = new Uint8Array(10);
+      vp8x[0] = flags;
+      vp8x[4] = (w - 1) & 0xff; vp8x[5] = ((w - 1) >> 8) & 0xff; vp8x[6] = ((w - 1) >> 16) & 0xff;
+      vp8x[7] = (h - 1) & 0xff; vp8x[8] = ((h - 1) >> 8) & 0xff; vp8x[9] = ((h - 1) >> 16) & 0xff;
+      body = [riffChunk('VP8X', vp8x), u8.subarray(12), exif];
+    }
+    const size = 4 + body.reduce((a, b) => a + b.length, 0);
+    const head = new Uint8Array(12);
+    head.set([0x52, 0x49, 0x46, 0x46], 0);
+    new DataView(head.buffer).setUint32(4, size, true);
+    head.set([0x57, 0x45, 0x42, 0x50], 8);
+    return [head, ...body];
+  }
+
+  /* Añade el EXIF a un JPEG, PNG o WebP ya codificado. Otros formatos se devuelven igual. */
+  async function injectExif(blob, fmtId, tiff) {
+    if (!tiff || !['jpeg', 'png', 'webp'].includes(fmtId)) return blob;
+    const u8 = new Uint8Array(await blob.arrayBuffer());
+    const type = blob.type;
+    if (fmtId === 'jpeg') {
+      const len = 2 + 6 + tiff.length;
+      if (len > 0xffff) return blob; // no cabe en un segmento APP1
+      const seg = new Uint8Array(2 + len);
+      seg.set([0xff, 0xe1, len >> 8, len & 0xff, 0x45, 0x78, 0x69, 0x66, 0, 0]);
+      seg.set(tiff, 10);
+      let at = 2;
+      if (u8[2] === 0xff && u8[3] === 0xe0) at = 4 + ((u8[4] << 8) | u8[5]); // tras JFIF
+      return new Blob([u8.subarray(0, at), seg, u8.subarray(at)], { type });
+    }
+    if (fmtId === 'png') {
+      let p = 8;
+      while (p + 8 <= u8.length) {
+        const len = ((u8[p] << 24) | (u8[p + 1] << 16) | (u8[p + 2] << 8) | u8[p + 3]) >>> 0;
+        if (String.fromCharCode(u8[p + 4], u8[p + 5], u8[p + 6], u8[p + 7]) === 'IDAT') break;
+        p += 12 + len;
+      }
+      return new Blob([u8.subarray(0, p), pngChunk('eXIf', tiff), u8.subarray(p)], { type });
+    }
+    const parts = webpWithExif(u8, tiff);
+    return parts ? new Blob(parts, { type }) : blob;
+  }
+
+  return {
+    makeCanvas, canvasToBlob,
+    encodeBMP, encodeTIFF, encodeICO, encodeGIF, encodePNG8, wasmEncode, makePDF, makeZip,
+    readJpegExif, exifHasGps, cleanExif, injectExif,
+  };
+}
+
+if (typeof window !== 'undefined') window.Encoders = PixeloteEncoders(window);
