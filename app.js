@@ -5,6 +5,27 @@
   const $$ = (s, r = document) => Array.from(r.querySelectorAll(s));
   const t = (s, p) => I18N.t(s, p);
 
+  const APP_VERSION = '4.1.0';
+
+  /* Dónde llegan los informes de problemas. Rellena uno de los dos para que
+   * aparezca el botón «Enviar»; si los dos están vacíos, el informe se puede
+   * copiar o descargar. Ejemplos: email: 'tu@correo.com', github: 'usuario/pixelote'. */
+  const BUG_REPORT = { email: '', github: '' };
+
+  // Últimos errores, para adjuntarlos al informe de problemas
+  const errorLog = [];
+  function logError(msg) {
+    errorLog.push(`${new Date().toISOString().slice(11, 19)} ${String(msg).slice(0, 300)}`);
+    if (errorLog.length > 15) errorLog.shift();
+  }
+  window.addEventListener('error', (e) => logError(e.message));
+  window.addEventListener('unhandledrejection', (e) => logError(e.reason && e.reason.message ? e.reason.message : e.reason));
+  const consoleError = console.error.bind(console);
+  console.error = (...args) => {
+    logError(args.map((a) => (a && a.message) || a).join(' '));
+    consoleError(...args);
+  };
+
   /* ---------- Catálogo ---------- */
 
   const FORMATS = [
@@ -1672,6 +1693,99 @@
     applyCompareX(0.5);
   }
 
+  /* ---------- Informe de problemas ---------- */
+
+  function currentTheme() {
+    return document.documentElement.dataset.theme || (matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light');
+  }
+
+  /* El informe va en español (lo lee quien mantiene la app). Nunca incluye las
+   * imágenes ni sus nombres, ni el texto de la marca de agua. */
+  function buildReport() {
+    const what = $('#bugText').value.trim();
+    const steps = $('#bugSteps').value.trim();
+    const lines = ['Pixelote — informe de problema', `Fecha: ${new Date().toISOString()}`, '', '## Qué ha pasado', what || '—'];
+    if (steps) lines.push('', '## Pasos para repetirlo', steps);
+    if ($('#bugDiag').checked) {
+      const types = {};
+      items.forEach((i) => {
+        const k = i.file.type || '.' + (i.file.name.split('.').pop() || '?').toLowerCase();
+        types[k] = (types[k] || 0) + 1;
+      });
+      const count = (st) => items.filter((i) => i.status === st).length;
+      const s = Object.assign({}, settings);
+      delete s.wmText;
+      lines.push('', '## Datos técnicos',
+        `Versión: ${APP_VERSION}`,
+        `Navegador: ${navigator.userAgent}`,
+        `Idioma: ${I18N.lang} · Tema: ${currentTheme()} · Diseño: ${document.documentElement.dataset.design || '—'}`,
+        `Pantalla: ${screen.width}×${screen.height} @${window.devicePixelRatio}x · Ventana: ${innerWidth}×${innerHeight}`,
+        `Abierta desde: ${location.protocol.replace(':', '')} · Instalada: ${matchMedia('(display-mode: standalone)').matches ? 'sí' : 'no'}`,
+        `Formatos que genera: ${FORMATS.filter((f) => f.mime && supported[f.id]).map((f) => f.label).join(', ')} · AVIF nativo: ${nativeAvif ? 'sí' : 'no'}`,
+        `Workers en segundo plano: ${pool.slots.length}`,
+        `Imágenes: ${items.length} (${Object.entries(types).map(([k, v]) => `${k} ×${v}`).join(', ') || '—'})`,
+        `Estados: listas ${count('ready')}, con error ${count('error')}, ilegibles ${count('invalid')}`,
+        `Ajustes: ${JSON.stringify(s)}`,
+        '', '## Errores recientes', ...(errorLog.length ? errorLog.map((e) => '- ' + e) : ['—']));
+    }
+    return lines.join('\n');
+  }
+
+  function bugSendUrl(report) {
+    const title = '[Bug] ' + ($('#bugText').value.trim().split('\n')[0] || 'Problema').slice(0, 70);
+    if (BUG_REPORT.github) {
+      return `https://github.com/${BUG_REPORT.github}/issues/new?title=${encodeURIComponent(title)}&body=${encodeURIComponent(report.slice(0, 6000))}`;
+    }
+    if (BUG_REPORT.email) {
+      // Los clientes de correo cortan los enlaces mailto largos
+      return `mailto:${BUG_REPORT.email}?subject=${encodeURIComponent(title)}&body=${encodeURIComponent(report.slice(0, 1800))}`;
+    }
+    return null;
+  }
+
+  function refreshBugReport() {
+    const report = buildReport();
+    $('#bugReport').textContent = report;
+    const url = bugSendUrl(report);
+    $('#bugSend').hidden = !url;
+    $('#bugHint').hidden = !!url;
+    if (url) $('#bugSend').href = url;
+    return report;
+  }
+
+  function bindBugReport() {
+    $('#bugBtn').addEventListener('click', () => {
+      refreshBugReport();
+      $('#bugDialog').showModal();
+      $('#bugText').focus();
+    });
+    for (const id of ['bugText', 'bugSteps', 'bugDiag']) $('#' + id).addEventListener('input', refreshBugReport);
+    const needText = () => {
+      if ($('#bugText').value.trim()) return false;
+      toast(t('Escribe primero qué ha pasado'));
+      $('#bugText').focus();
+      return true;
+    };
+    $('#bugCopy').addEventListener('click', async () => {
+      if (needText()) return;
+      const report = refreshBugReport();
+      try { await navigator.clipboard.writeText(report); } catch (_) {
+        const ta = document.createElement('textarea');
+        ta.value = report; document.body.appendChild(ta); ta.select(); document.execCommand('copy'); ta.remove();
+      }
+      toast(t('Informe copiado'));
+    });
+    $('#bugDownload').addEventListener('click', () => {
+      if (needText()) return;
+      const day = new Date().toISOString().slice(0, 10);
+      download(new Blob([refreshBugReport()], { type: 'text/plain;charset=utf-8' }), `informe-pixelote-${day}.txt`);
+    });
+    $('#bugSend').addEventListener('click', (e) => {
+      if (needText()) { e.preventDefault(); return; }
+      refreshBugReport();
+    });
+  }
+
   /* ---------- Tema, idioma, app instalable ---------- */
 
   function bindTheme() {
@@ -1701,6 +1815,7 @@
     sel.addEventListener('change', () => I18N.setLang(sel.value));
     I18N.onChange(() => {
       document.title = t('Pixelote · Conversor de imágenes');
+      document.body.dataset.drop = t('Suelta para añadir');
       renderPanelLists();
       renderCropRatios();
       syncPanel();
@@ -1809,6 +1924,9 @@
   (async function init() {
     I18N.init();
     document.title = t('Pixelote · Conversor de imágenes');
+    document.body.dataset.drop = t('Suelta para añadir');
+    $('#appVersion').textContent = APP_VERSION;
+    $('#year').textContent = new Date().getFullYear();
     await detectSupport();
     if (!supported[settings.format]) settings.format = supported.webp ? 'webp' : 'jpeg';
     let savedLogo = null;
@@ -1819,6 +1937,7 @@
     buildCropDialog();
     buildCompareDialog();
     bindItemDialog();
+    bindBugReport();
     bindReorder();
     bindInput();
     bindLanguage(bindTheme());

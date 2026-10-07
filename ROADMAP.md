@@ -76,8 +76,11 @@ Leyenda: ✅ hecho · 🔜 siguiente · 🧭 más adelante · 💡 idea a valora
 - ✅ **Marca de agua opcional** de texto (color a elegir) o logo, en 9 posiciones o en mosaico, con tamaño, opacidad y vista previa. Por defecto, desactivada.
 - ✅ **Reordenar el lote** arrastrando las tarjetas o con los botones del diálogo ⚙. **Ajustes propios por imagen:** formato, calidad y ancho máximo.
 - ✅ **Carpetas:** soltar carpetas enteras o elegirlas con "Añadir carpeta", manteniendo las subcarpetas en el ZIP. **Guardar en carpeta** directamente (Chrome y Edge), sin sobrescribir archivos.
-- ✅ **Idiomas:** español, inglés y portugués (se detecta el del navegador y se puede cambiar).
+- ✅ **Idiomas:** español, inglés, portugués y alemán (se detecta el del navegador y se puede cambiar).
 - ✅ **Botón de modo claro / oscuro** (por defecto sigue al sistema; la elección se recuerda).
+- ✅ **Alemán** como cuarto idioma.
+- ✅ **Pie de página** con presentación breve, versión e **informe de problemas** (copiar, descargar o enviar por email / GitHub si se configura).
+- ✅ **Diseño moderno** (`styles-moderno.css`) como alternativa al clásico, que se conserva (`?diseno=clasico`).
 
 **Notas técnicas**
 - Al publicar una versión nueva, sube `VERSION` en `sw.js` para que los navegadores renueven la caché.

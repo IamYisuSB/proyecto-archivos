@@ -563,3 +563,28 @@ input[type="range"]::-moz-range-thumb {
   .toolbar-actions .btn { padding: 6px 10px; font-size: 13px; }
   .res-actions .btn { flex: 1 1 100%; }
 }
+
+/* ---------- Pie de página e informe de problemas ---------- */
+body.dragging::after { content: attr(data-drop); }
+.site-footer {
+  display: flex; align-items: flex-start; justify-content: space-between; gap: 20px; flex-wrap: wrap;
+  padding: 22px 28px 30px; border-top: 1px solid var(--border); color: var(--muted); font-size: 13.5px;
+}
+.footer-copy { max-width: 560px; }
+.footer-copy p { margin: 4px 0 0; }
+.footer-brand { font-weight: 700; color: var(--text); }
+.footer-side { display: flex; flex-direction: column; align-items: flex-end; gap: 8px; }
+.footer-small { font-size: 12px; }
+.dialog-lead { margin-top: -6px; font-size: 13.5px; }
+textarea.text-input { resize: vertical; line-height: 1.45; }
+.bug-preview summary { cursor: pointer; font-size: 13px; font-weight: 600; color: var(--accent); }
+.bug-preview pre {
+  margin: 8px 0 0; max-height: 200px; overflow: auto; padding: 10px; border-radius: 8px; background: var(--surface-2);
+  font: 11.5px/1.5 ui-monospace, Consolas, monospace; white-space: pre-wrap; word-break: break-word;
+}
+@media (max-width: 900px) {
+  .site-footer { padding: 20px 16px 28px; }
+  .footer-side { align-items: flex-start; }
+}
+.small-inner .check { flex-wrap: nowrap; align-items: flex-start; }
+.small-inner .check > span { flex: 1; min-width: 0; }

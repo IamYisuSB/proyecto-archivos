@@ -8,10 +8,22 @@
   <meta name="theme-color" content="#5b5bd6">
   <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><rect width='32' height='32' rx='8' fill='%235b5bd6'/><path d='M8 22l5-6 4 4 3-3 4 5z' fill='white'/><circle cx='21' cy='11' r='2.5' fill='white'/></svg>">
   <link rel="apple-touch-icon" href="icons/icon-192.png">
-  <link rel="stylesheet" href="styles.css">
+  <link rel="stylesheet" href="styles-moderno.css" id="designCss">
   <script>
     // Tema elegido con el botón, antes de pintar para que no parpadee
     try { var th = localStorage.getItem('pixelote.theme'); if (th) document.documentElement.dataset.theme = th; } catch (e) {}
+    // Diseño: el moderno por defecto. Para ver el clásico, abre la página con ?diseno=clasico
+    // (se recuerda; ?diseno=moderno vuelve al nuevo). El archivo del clásico es styles.css.
+    (function () {
+      var d = null;
+      try {
+        var q = new URLSearchParams(location.search).get('diseno');
+        if (q === 'clasico' || q === 'moderno') localStorage.setItem('pixelote.design', q);
+        d = localStorage.getItem('pixelote.design');
+      } catch (e) {}
+      if (d === 'clasico') document.getElementById('designCss').href = 'styles.css';
+      document.documentElement.dataset.design = d === 'clasico' ? 'clasico' : 'moderno';
+    })();
   </script>
 </head>
 <body>
@@ -35,6 +47,7 @@
         <option value="es">ES</option>
         <option value="en">EN</option>
         <option value="pt">PT</option>
+        <option value="de">DE</option>
       </select>
       <button class="icon-toggle" id="themeBtn" type="button"></button>
     </div>
@@ -294,6 +307,18 @@
     </aside>
   </main>
 
+  <footer class="site-footer">
+    <div class="footer-copy">
+      <span class="footer-brand">Pixelote</span>
+      <p>Convierte tus imágenes sin subirlas a ningún sitio: todo ocurre en tu navegador, así que tus fotos siguen siendo solo tuyas.</p>
+      <p class="footer-small">Sin registros, sin anuncios, sin servidores.</p>
+    </div>
+    <div class="footer-side">
+      <button type="button" class="btn ghost small" id="bugBtn">🐞 Reportar un problema</button>
+      <span class="footer-small"><span>Versión</span> <span id="appVersion"></span> · © <span id="year"></span> Pixelote</span>
+    </div>
+  </footer>
+
   <!-- Editor: recortar, girar y voltear -->
   <dialog id="cropDialog" class="crop-dialog">
     <form method="dialog" class="crop-inner">
@@ -407,6 +432,35 @@
         <button type="button" class="btn ghost small" id="shareFile">Descargar archivo</button>
         <span class="spacer"></span>
         <button type="button" class="btn primary small" id="shareCopy">Copiar enlace</button>
+        <button type="submit" class="btn ghost small" value="close">Cerrar</button>
+      </footer>
+    </form>
+  </dialog>
+
+  <!-- Informe de problemas -->
+  <dialog id="bugDialog" class="small-dialog">
+    <form method="dialog" class="small-inner">
+      <h2>Reportar un problema</h2>
+      <div class="dialog-lead muted">Cuéntanos qué ha fallado. Prepararemos un informe que puedes copiar, descargar o enviar.</div>
+      <label class="field">
+        <span>¿Qué ha pasado?</span>
+        <textarea id="bugText" rows="3" class="text-input" placeholder="Por ejemplo: al convertir un HEIC a JPG, la imagen sale girada."></textarea>
+      </label>
+      <label class="field">
+        <span>Pasos para repetirlo (opcional)</span>
+        <textarea id="bugSteps" rows="2" class="text-input" placeholder="1. Elegí el atajo Instagram… 2. …"></textarea>
+      </label>
+      <label class="check"><input type="checkbox" id="bugDiag" checked> <span>Incluir datos técnicos (navegador, ajustes y errores; nunca tus imágenes ni sus nombres)</span></label>
+      <details class="bug-preview">
+        <summary>Ver el informe</summary>
+        <pre id="bugReport"></pre>
+      </details>
+      <small class="muted" id="bugHint">Copia o descarga el informe y envíaselo a quien mantiene Pixelote.</small>
+      <footer class="small-foot">
+        <button type="button" class="btn ghost small" id="bugDownload">Descargar</button>
+        <span class="spacer"></span>
+        <button type="button" class="btn ghost small" id="bugCopy">Copiar</button>
+        <a class="btn primary small" id="bugSend" href="#" target="_blank" rel="noopener" hidden>Enviar</a>
         <button type="submit" class="btn ghost small" value="close">Cerrar</button>
       </footer>
     </form>

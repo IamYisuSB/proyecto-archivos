@@ -11,7 +11,20 @@ Funciona sin internet, salvo la primera vez que abres un HEIC o un TIFF, que gen
 **Formatos de entrada:** JPG, PNG, WebP, AVIF, GIF, BMP, SVG, ICO, HEIC/HEIF, TIFF y RAW de cámara (vista previa incrustada).
 **Formatos de salida:** WebP, JPG, PNG, AVIF, GIF, PDF, BMP, TIFF e ICO, o "Auto" (elige según sea foto, transparencia o gráfico).
 
-**Extras:** PNG optimizado con paleta, JPG con MozJPEG, comparador antes/después, girar y voltear, conservar o quitar los datos EXIF/GPS, procesado en paralelo en segundo plano, varios tamaños a la vez, marca de agua opcional, atajos propios que se pueden compartir, ajustes por imagen, carpetas, modo claro/oscuro y tres idiomas (español, inglés y portugués).
+**Extras:** PNG optimizado con paleta, JPG con MozJPEG, comparador antes/después, girar y voltear, conservar o quitar los datos EXIF/GPS, procesado en paralelo en segundo plano, varios tamaños a la vez, marca de agua opcional, atajos propios que se pueden compartir, ajustes por imagen, carpetas, modo claro/oscuro, cuatro idiomas (español, inglés, portugués y alemán) e informe de problemas.
+
+## Diseños
+
+Hay dos diseños con el mismo HTML:
+
+- **Moderno** (`styles-moderno.css`): el que se usa por defecto.
+- **Clásico** (`styles.css`): el anterior. Para verlo, abre la página con `?diseno=clasico` al final de la dirección (se recuerda). Con `?diseno=moderno` vuelves al nuevo.
+
+Para quedarte con uno de forma permanente, cambia el `href` de `<link id="designCss">` en `index.html`.
+
+## Informe de problemas
+
+El botón **🐞 Reportar un problema** del pie de página prepara un informe con la descripción y datos técnicos (navegador, ajustes, errores recientes; nunca las imágenes ni sus nombres) para copiarlo o descargarlo. Para que además aparezca el botón **Enviar**, rellena `BUG_REPORT` al principio de `app.js` con un email o un repositorio de GitHub (`usuario/repositorio`), y los informes llegarán como correo o como issue.
 
 ## Instalarla como app y usarla sin conexión
 
@@ -32,9 +45,10 @@ Una vez servida, en "Opciones avanzadas" el botón **Descargar códecs** deja HE
 | Archivo | Contenido |
 |---|---|
 | `index.html` | Estructura de la página |
-| `i18n.js` | Traducciones (español, inglés, portugués) |
+| `styles-moderno.css` | Diseño moderno (el activo) |
+| `i18n.js` | Traducciones (español, inglés, portugués, alemán) |
 | `sw.js`, `manifest.webmanifest`, `icons/` | App instalable y uso sin conexión |
-| `styles.css` | Estilos, con modo claro/oscuro y versión móvil |
+| `styles.css` | Diseño clásico, con modo claro/oscuro y versión móvil |
 | `app.js` | Interfaz: carga de imágenes, ajustes, editor, comparador y reparto del trabajo entre Workers |
 | `pipeline.js` | Procesado de una imagen (recorte, tamaño, codificación, EXIF); se ejecuta igual en un Worker o en la página |
 | `encoders.js` | Codificadores BMP, TIFF, ICO, GIF, PDF y PNG con paleta, ZIP, EXIF, y AVIF/MozJPEG por WebAssembly |
