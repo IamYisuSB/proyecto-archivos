@@ -44,13 +44,16 @@ Para quedarte con uno de forma permanente, cambia el `href` de `<link id="design
 
 **Para reforzarlo aún más (opcional, de pago):** en el panel de Web3Forms, la opción Pro *Restrict to domain* hace que solo se acepten informes desde tu dominio.
 
-**Si cambias código protegido por la CSP:** si editas el pequeño script de `<head>` en `index.html` o el de `heic-sandbox.html`, recalcula su huella `sha256` en la CSP del mismo archivo, o el navegador lo bloqueará.
+**Si cambias código protegido por la CSP:** si editas el pequeño script de `<head>` (que está igual en `index.html` y `descargar/index.html`) o el de `heic-sandbox.html`, recalcula su huella `sha256` en la CSP de esos archivos, o el navegador lo bloqueará.
+
+**Direcciones limpias:** servida desde una web, la app está en `/` y la descarga en `/descargar/`, sin `index.html` ni `.html` a la vista. Si alguien entra por `/index.html`, la barra de direcciones se limpia sola. Abierta con doble clic, los enlaces añaden `index.html` automáticamente, porque así el navegador no abre las carpetas.
 
 ## App de escritorio para Windows
 
 Pixelote también existe como programa de Windows (Tauri, ~3,5 MB), hecho a partir de esta misma web: ver [`desktop/README.md`](desktop/README.md).
 
-- La web enlaza a **`descargar.html`** («App para Windows» en la cabecera y «Descargar para Windows» en el pie). Esa página ofrece el instalador y la versión portable, con requisitos, el aviso de Windows la primera vez y las huellas SHA-256 para comprobar los archivos.
+- El botón **Descargar** de la cabecera abre un menú con dos opciones: **Instalar en este navegador** (la app web o PWA; si el navegador no lo permite con un clic, explica cómo hacerlo) y **App para Windows**, que lleva a **`/descargar/`**. El pie también enlaza ahí.
+- Esa página ofrece el instalador y la versión portable (alojados en GitHub Releases), con requisitos, el aviso de Windows la primera vez y las huellas SHA-256 para comprobar los archivos.
 - **Para publicar una versión nueva**, ejecuta `npm run publicar` en la carpeta `desktop/`. Compila, copia los `.exe` a `descargas/` y actualiza `descargas/version.js`, que la página lee para mostrar la versión, el tamaño y las huellas.
 - La versión se cambia en `desktop/src-tauri/tauri.conf.json` (y en `APP_VERSION` de `app.js` para que coincida).
 
@@ -74,7 +77,7 @@ Una vez servida, en "Opciones avanzadas" el botón **Descargar códecs** deja TI
 |---|---|
 | `config.js` | Configuración (clave de Web3Forms para los informes) |
 | `ui-common.js` | Selector de idioma, tema y pie de página, compartidos por las dos páginas |
-| `descargar.html`, `descargar.js`, `descargar.css` | Página de descarga de la app de Windows |
+| `descargar/index.html`, `descargar.js`, `descargar.css` | Página de descarga de la app de Windows (dirección `/descargar/`) |
 | `descargas/` | Instalador y `.exe` portable publicados, con `version.js` |
 | `desktop/` | Proyecto de la app de escritorio (Tauri) |
 | `index.html` | Estructura de la página |

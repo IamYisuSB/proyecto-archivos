@@ -1,6 +1,6 @@
 // Publica la app de escritorio:
 //  1. Copia el instalador y el .exe portable a descargas/ (junto a la app web).
-//  2. Escribe descargas/version.js, que la página descargar.html usa para
+//  2. Escribe descargas/version.js, que la página descargar/ usa para
 //     mostrar versión, tamaño, huellas SHA-256 y los enlaces de descarga.
 //  3. Con --github, crea (o actualiza) la Release vX.Y.Z en GitHub con los dos
 //     .exe. Necesita la herramienta `gh` con la sesión iniciada (gh auth login).

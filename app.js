@@ -137,8 +137,16 @@
   function baseName(name) {
     return name.replace(/\.[^.]+$/, '') || 'imagen';
   }
+  /* Deja respirar a la página entre imagen e imagen. Si la pestaña no está a la
+   * vista el navegador no pinta fotogramas, así que no se espera más de 50 ms:
+   * la conversión sigue aunque cambies de pestaña. */
   function nextFrame() {
-    return new Promise((r) => requestAnimationFrame(() => setTimeout(r, 0)));
+    return new Promise((r) => {
+      let done = false;
+      const go = () => { if (!done) { done = true; setTimeout(r, 0); } };
+      requestAnimationFrame(go);
+      setTimeout(go, 50);
+    });
   }
   function makeCanvas(w, h) {
     const c = document.createElement('canvas');
@@ -697,6 +705,7 @@
       const it = { id: nextId++, file, kind: Codecs.kindOf(file), status: 'loading', crop: null, result: null, m: IDENTITY, ov: null, relDir: relDirOf(file) };
       items.push(it);
       it.el = createCard(it);
+      updateCard(it); // se ve ya como "Cargando…" aunque aún no le toque
       $('#grid').appendChild(it.el);
     }
     refreshChrome();
@@ -2170,7 +2179,7 @@
   /* ---------- Tema, idioma, app instalable ---------- */
 
   /* Lo que la app rehace al cambiar de idioma (el selector de idioma, el tema y
-   * el pie de página están en ui-common.js, compartido con descargar.html). */
+   * el pie de página están en ui-common.js, compartido con descargar/). */
   function bindLanguage() {
     I18N.onChange(() => {
       document.title = t('Pixelote · Conversor de imágenes');
@@ -2183,6 +2192,92 @@
     });
   }
 
+  /* ---------- Botón «Descargar»: app web (PWA) o app para Windows ---------- */
+
+  let installPrompt = null; // evento del navegador para instalar con un clic (Chrome, Edge…)
+  let pwaInstalled = false;
+
+  function runningAsPwa() {
+    return matchMedia('(display-mode: standalone)').matches || matchMedia('(display-mode: window-controls-overlay)').matches;
+  }
+
+  function paintPwaItem() {
+    const item = $('#pwaItem');
+    if (!item) return;
+    const installed = pwaInstalled || runningAsPwa();
+    item.setAttribute('aria-disabled', installed ? 'true' : 'false');
+    $('#pwaItemSub').textContent = installed
+      ? t('Ya está instalada en este navegador')
+      : t('App web: con su propia ventana y sin conexión');
+  }
+
+  /* Cómo instalarla cuando el navegador no ofrece hacerlo con un clic. */
+  function installHelp() {
+    const ua = navigator.userAgent;
+    if (!/^https?:$/.test(location.protocol)) {
+      return t('Abierta como archivo no se puede instalar. Ábrela desde su página web (con https) y vuelve a pulsar este botón.');
+    }
+    if (/iPhone|iPad|iPod/.test(ua) || (/Macintosh/.test(ua) && navigator.maxTouchPoints > 1)) {
+      return t('En Safari, pulsa el botón Compartir y luego «Añadir a pantalla de inicio».');
+    }
+    if (/Firefox\//.test(ua)) {
+      return t('Firefox no permite instalar apps web. Puedes usar Chrome o Edge, o descargar la app para Windows.');
+    }
+    if (/Safari\//.test(ua) && !/Chrome|Chromium|Edg\//.test(ua)) {
+      return t('En Safari, abre el menú Archivo y elige «Añadir al Dock».');
+    }
+    return t('Busca el icono de instalar en la barra de direcciones, o abre el menú del navegador (⋮) y elige «Instalar Pixelote».');
+  }
+
+  async function installPwa() {
+    if (pwaInstalled || runningAsPwa()) { toast(t('Ya está instalada en este navegador')); return; }
+    if (installPrompt) {
+      const ev = installPrompt;
+      installPrompt = null;
+      ev.prompt();
+      await ev.userChoice.catch(() => null);
+      paintPwaItem();
+      return;
+    }
+    $('#installText').textContent = installHelp();
+    $('#installDialog').showModal();
+  }
+
+  function setupGetMenu() {
+    const btn = $('#getBtn');
+    const menu = $('#getMenu');
+    if (!btn || IS_DESKTOP) return;
+    const items = () => Array.from(menu.querySelectorAll('[role="menuitem"]'));
+    const open = () => {
+      menu.hidden = false;
+      btn.setAttribute('aria-expanded', 'true');
+      items()[0].focus();
+    };
+    const close = (focusButton) => {
+      menu.hidden = true;
+      btn.setAttribute('aria-expanded', 'false');
+      if (focusButton) btn.focus();
+    };
+    btn.addEventListener('click', () => (menu.hidden ? open() : close()));
+    btn.addEventListener('keydown', (e) => {
+      if (e.key === 'ArrowDown' || e.key === 'ArrowUp') { e.preventDefault(); open(); }
+    });
+    menu.addEventListener('keydown', (e) => {
+      const list = items();
+      const i = list.indexOf(document.activeElement);
+      if (e.key === 'ArrowDown') { e.preventDefault(); list[(i + 1) % list.length].focus(); }
+      else if (e.key === 'ArrowUp') { e.preventDefault(); list[(i - 1 + list.length) % list.length].focus(); }
+      else if (e.key === 'Escape') { e.preventDefault(); close(true); }
+      else if (e.key === 'Tab') close(false);
+    });
+    document.addEventListener('click', (e) => {
+      if (!menu.hidden && !e.target.closest('#getMenuWrap')) close(false);
+    });
+    $('#pwaItem').addEventListener('click', () => { close(false); installPwa(); });
+    I18N.onChange(paintPwaItem);
+    paintPwaItem();
+  }
+
   function setupPWA() {
     if (IS_DESKTOP || !('serviceWorker' in navigator) || !/^https?:$/.test(location.protocol)) return;
     // El manifiesto solo se enlaza al servir la app por http(s): desde file:// el navegador lo bloquea
@@ -2192,21 +2287,15 @@
     document.head.appendChild(link);
     navigator.serviceWorker.register('sw.js').then(() => { $('#offlineRow').hidden = false; }).catch((e) => console.warn('Sin modo sin conexión:', e));
 
-    let deferred = null;
     window.addEventListener('beforeinstallprompt', (e) => {
       e.preventDefault();
-      deferred = e;
-      $('#installBtn').hidden = false;
-    });
-    $('#installBtn').addEventListener('click', async () => {
-      if (!deferred) return;
-      deferred.prompt();
-      await deferred.userChoice;
-      deferred = null;
-      $('#installBtn').hidden = true;
+      installPrompt = e;
+      paintPwaItem();
     });
     window.addEventListener('appinstalled', () => {
-      $('#installBtn').hidden = true;
+      installPrompt = null;
+      pwaInstalled = true;
+      paintPwaItem();
       toast(t('¡Pixelote instalado!'));
     });
 
@@ -2302,6 +2391,7 @@
     PixeloteUI.setupTheme();
     PixeloteUI.setupLangPicker();
     PixeloteUI.setupFooter();
+    setupGetMenu();
     bindLanguage();
     syncPanel();
     refreshChrome();

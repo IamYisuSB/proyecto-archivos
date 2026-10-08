@@ -2,9 +2,11 @@
 <html lang="es">
 <head>
   <meta charset="utf-8">
+  <!-- Esta página vive en /descargar/: todas las rutas relativas parten de la raíz del sitio -->
+  <base href="../">
   <!-- Seguridad: la página solo carga código propio y del CDN de los códecs, y solo envía datos a Web3Forms.
        Si cambias el script de abajo, recalcula su huella sha256. Si usas reportEndpoint, añade su dominio a connect-src. -->
-  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'sha256-m9dMXTQTlk/JuP85zKJ0hAnbAgpksdyMDPvv/IGMOvw=' https://cdn.jsdelivr.net blob: 'wasm-unsafe-eval'; worker-src 'self' blob:; connect-src 'self' https://cdn.jsdelivr.net https://api.web3forms.com blob: data:; img-src 'self' data: blob:; style-src 'self'; font-src 'self'; manifest-src 'self'; media-src 'none'; object-src 'none'; base-uri 'none'; form-action 'none'">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'sha256-m9dMXTQTlk/JuP85zKJ0hAnbAgpksdyMDPvv/IGMOvw=' https://cdn.jsdelivr.net blob: 'wasm-unsafe-eval'; worker-src 'self' blob:; connect-src 'self' https://cdn.jsdelivr.net https://api.web3forms.com blob: data:; img-src 'self' data: blob:; style-src 'self'; font-src 'self'; manifest-src 'self'; media-src 'none'; object-src 'none'; base-uri 'self'; form-action 'none'">
   <meta name="referrer" content="strict-origin-when-cross-origin">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Descargar Pixelote para Windows</title>
@@ -34,7 +36,7 @@
 </head>
 <body class="dl-body">
   <header class="topbar">
-    <a class="brand brand-link" href="index.html">
+    <a class="brand brand-link" href="./">
       <span class="logo" aria-hidden="true">
         <svg viewBox="0 0 48 48" aria-hidden="true"><defs> <linearGradient id="pxg-head" x1="0" y1="0" x2="1" y2="1"> <stop offset="0" stop-color="#6d5dfc"/> <stop offset=".55" stop-color="#a855f7"/> <stop offset="1" stop-color="#ec4899"/> </linearGradient> </defs> <rect width="48" height="48" rx="14" fill="url(#pxg-head)"/> <g fill="#fff"> <rect x="12.5" y="9.5" width="5" height="5" rx="1.3"/> <rect x="18.5" y="9.5" width="5" height="5" rx="1.3"/> <rect x="24.5" y="9.5" width="5" height="5" rx="1.3"/> <rect x="12.5" y="15.5" width="5" height="5" rx="1.3"/> <rect x="30.5" y="15.5" width="5" height="5" rx="1.3"/> <rect x="12.5" y="21.5" width="5" height="5" rx="1.3"/> <rect x="18.5" y="21.5" width="5" height="5" rx="1.3"/> <rect x="24.5" y="21.5" width="5" height="5" rx="1.3"/> <rect x="12.5" y="27.5" width="5" height="5" rx="1.3"/> <rect x="12.5" y="33.5" width="5" height="5" rx="1.3"/> <rect x="19.6" y="34.6" width="3.8" height="3.8" rx="1" opacity=".85"/> <rect x="25.2" y="35.7" width="2.7" height="2.7" rx=".7" opacity=".65"/> <rect x="29.7" y="36.7" width="1.7" height="1.7" rx=".45" opacity=".45"/> </g></svg>
       </span>
@@ -44,7 +46,7 @@
       </div>
     </a>
     <div class="top-actions">
-      <a class="btn ghost small" href="index.html">← Volver a la app</a>
+      <a class="btn ghost small" href="./">← Volver a la app</a>
       <div class="lang-picker" id="langPicker">
         <button type="button" class="lang-btn" id="langBtn" aria-haspopup="listbox" aria-expanded="false" aria-controls="langMenu" aria-label="Idioma">
           <span class="flag" id="langFlag" aria-hidden="true"></span>
@@ -142,7 +144,7 @@
       <p class="footer-small">Sin registros ni anuncios, y tus imágenes nunca se suben.</p>
     </div>
     <div class="footer-side">
-      <a class="btn ghost small" href="index.html">← Volver a la app</a>
+      <a class="btn ghost small" href="./">← Volver a la app</a>
       <span class="footer-small">© <span id="year"></span> Pixelote</span>
     </div>
   </footer>

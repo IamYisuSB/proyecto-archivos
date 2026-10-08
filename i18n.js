@@ -410,6 +410,18 @@
     ['Todas', 'All', 'Todos', 'Alle'],
     ['Privacidad', 'Privacy', 'Privacidade', 'Datenschutz'],
     ['Todo en tu equipo', 'Everything on your computer', 'Tudo no seu computador', 'Alles auf deinem Computer'],
+    // Botón «Descargar» de la cabecera
+    ['Instalar en este navegador', 'Install in this browser', 'Instalar neste navegador', 'In diesem Browser installieren'],
+    ['App web: con su propia ventana y sin conexión', 'Web app: its own window, works offline', 'App web: com janela própria e sem conexão', 'Web-App: eigenes Fenster, funktioniert offline'],
+    ['Programa para Windows 10 y 11', 'Program for Windows 10 and 11', 'Programa para Windows 10 e 11', 'Programm für Windows 10 und 11'],
+    ['Ya está instalada en este navegador', 'Already installed in this browser', 'Já está instalado neste navegador', 'Bereits in diesem Browser installiert'],
+    ['Instalar Pixelote', 'Install Pixelote', 'Instalar o Pixelote', 'Pixelote installieren'],
+    ['Entendido', 'Got it', 'Entendi', 'Verstanden'],
+    ['Abierta como archivo no se puede instalar. Ábrela desde su página web (con https) y vuelve a pulsar este botón.', "It can't be installed when opened as a file. Open it from its website (with https) and press this button again.", 'Aberto como arquivo não pode ser instalado. Abra pelo site (com https) e toque neste botão de novo.', 'Als Datei geöffnet lässt sie sich nicht installieren. Öffne sie über ihre Website (mit https) und tippe erneut auf diese Schaltfläche.'],
+    ['En Safari, pulsa el botón Compartir y luego «Añadir a pantalla de inicio».', 'In Safari, tap the Share button and then “Add to Home Screen”.', 'No Safari, toque no botão Compartilhar e depois em “Adicionar à Tela de Início”.', 'Tippe in Safari auf „Teilen“ und dann auf „Zum Home-Bildschirm“.'],
+    ['Firefox no permite instalar apps web. Puedes usar Chrome o Edge, o descargar la app para Windows.', "Firefox doesn't support installing web apps. You can use Chrome or Edge, or download the Windows app.", 'O Firefox não permite instalar apps web. Você pode usar o Chrome ou o Edge, ou baixar o app para Windows.', 'Firefox kann keine Web-Apps installieren. Du kannst Chrome oder Edge verwenden oder die Windows-App herunterladen.'],
+    ['En Safari, abre el menú Archivo y elige «Añadir al Dock».', 'In Safari, open the File menu and choose “Add to Dock”.', 'No Safari, abra o menu Arquivo e escolha “Adicionar ao Dock”.', 'Öffne in Safari das Menü „Ablage“ und wähle „Zum Dock hinzufügen“.'],
+    ['Busca el icono de instalar en la barra de direcciones, o abre el menú del navegador (⋮) y elige «Instalar Pixelote».', 'Look for the install icon in the address bar, or open the browser menu (⋮) and choose “Install Pixelote”.', 'Procure o ícone de instalar na barra de endereços, ou abra o menu do navegador (⋮) e escolha “Instalar o Pixelote”.', 'Suche das Installationssymbol in der Adressleiste oder öffne das Browser-Menü (⋮) und wähle „Pixelote installieren“.'],
     ['Ese email no parece válido', "That email doesn't look valid", 'Esse e-mail não parece válido', 'Diese E-Mail-Adresse scheint ungültig zu sein'],
   ];
   for (const [es, en, pt, de] of ROWS) { DICT.en[es] = en; DICT.pt[es] = pt; DICT.de[es] = de; }

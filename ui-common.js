@@ -1,5 +1,5 @@
 /* Piezas de interfaz compartidas por la app (index.html) y la página de
- * descarga (descargar.html): selector de idioma con banderas, botón de tema
+ * descarga (descargar/index.html): selector de idioma con banderas, botón de tema
  * claro / oscuro y el pie de página. Necesita i18n.js cargado antes. */
 (function (global) {
   'use strict';
@@ -126,6 +126,26 @@
     I18N.onChange(paint);
     paint();
   }
+
+  /* ---------- Direcciones limpias ---------- */
+
+  /* En la web, /descargar/ en vez de /descargar.html, y / en vez de /index.html.
+   * Abierta como archivo (doble clic) el navegador no abre el index.html de una
+   * carpeta, así que ahí se añade a los enlaces. */
+  function tidyUrls() {
+    if (/^https?:$/.test(location.protocol)) {
+      if (/\/index\.html$/.test(location.pathname)) {
+        history.replaceState(null, '', location.pathname.replace(/index\.html$/, '') + location.search + location.hash);
+      }
+      return;
+    }
+    if (location.protocol !== 'file:') return;
+    document.querySelectorAll('a[href]').forEach((a) => {
+      const h = a.getAttribute('href');
+      if (!/^[a-z][\w+.-]*:/i.test(h) && h.endsWith('/')) a.setAttribute('href', h + 'index.html');
+    });
+  }
+  tidyUrls();
 
   global.PixeloteUI = { IS_DESKTOP, setupTheme, setupLangPicker, setupFooter, flagSvg, LANG_NAMES };
 })(window);
